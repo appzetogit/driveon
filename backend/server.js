@@ -97,8 +97,13 @@ app.use('/uploads', express.static(PUBLIC_UPLOADS_DIR));
 app.use('/api/uploads', express.static(PUBLIC_UPLOADS_DIR));
 
 // Smart Fallback Proxy for /uploads: if file is not found locally, fetch it on-demand from live VPS,
-// save it to local disk (caching), and serve it immediately
-app.use('/uploads', async (req, res, next) => {
+// save it to local disk (caching), and serve it immediately (DEV ONLY - never runs on live VPS)
+app.use(['/uploads', '/api/uploads'], async (req, res, next) => {
+  // If running on production server, do not proxy to remote (prevents self-referencing timeout loops)
+  if (process.env.NODE_ENV === 'production' || process.env.IS_LIVE === 'true') {
+    return next();
+  }
+
   const liveServerUrl = process.env.LIVE_SERVER_URL?.trim();
   if (!liveServerUrl || liveServerUrl.includes('localhost') || liveServerUrl.includes('127.0.0.1')) {
     return next();
@@ -386,13 +391,13 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/common", commonRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/reviews", reviewRoutes);
-app.use("/api", supportRoutes);
-app.use("/api", authRoutes);
-app.use("/api", userRoutes);
-app.use("/api", locationRoutes);
-app.use("/api", referralRoutes);
 app.use("/api/kyc", kycRoutes);
 app.use("/api/internal", mediaSyncRoutes);
+app.use("/api", supportRoutes);
+app.use("/api", authRoutes);
+app.use("/api", locationRoutes);
+app.use("/api", referralRoutes);
+app.use("/api", userRoutes);
 
 
 // Basic route
