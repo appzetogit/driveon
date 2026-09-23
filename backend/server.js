@@ -455,12 +455,11 @@ server.listen(PORT, () => {
   // Verify SMSIndia Hub configuration
   const smsApiKey = process.env.SMSINDIAHUB_API_KEY?.trim();
   const smsSenderId = process.env.SMSINDIAHUB_SENDER_ID?.trim();
+  const smsPeId = process.env.SMSINDIAHUB_PE_ID?.trim();
+  const smsTemplateId = process.env.SMSINDIAHUB_TEMPLATE_ID?.trim();
   if (smsApiKey && smsSenderId) {
     console.log(
-      `✅ SMSIndia Hub configured (API Key: ${smsApiKey.substring(
-        0,
-        8
-      )}..., Sender ID: ${smsSenderId})`
+      `✅ SMSIndia Hub configured (Sender ID: ${smsSenderId}, PE ID: ${smsPeId || "N/A"}, Template ID: ${smsTemplateId || "N/A"})`
     );
   } else {
     console.warn(`⚠️ SMSIndia Hub not configured:`);

@@ -4,7 +4,7 @@ import User from '../models/User.js';
 import Staff from '../models/Staff.js';
 import OTP from '../models/OTP.js';
 import CRMRole from '../models/CRMRole.js';
-import { generateOTP, getOTPExpiry, isOTPExpired, sendOTP } from '../utils/otp.service.js';
+import { generateOTP, getOTPExpiry, isOTPExpired, sendOTP, isTestPhoneNumber, getTestOTP } from '../utils/otp.service.js';
 import { generateToken, generateRefreshToken } from '../utils/generateToken.js';
 import { processReferralSignup } from './referral.controller.js';
 import sendEmail from '../utils/sendEmail.js';
@@ -160,7 +160,7 @@ export const register = async (req, res) => {
     // Check if SMS failed and handle accordingly
     if (smsErrorOccurred || !smsSent) {
       // Check if it's a test number (allow failure for test numbers in development)
-      const isTestNumber = normalizedPhone && ['9993911855'].some(testNum => normalizedPhone.endsWith(testNum));
+      const isTestNumber = isTestPhoneNumber(normalizedPhone);
 
       if (isTestNumber && process.env.NODE_ENV === 'development') {
         console.log(`⚠️ Test number - SMS failed but allowing registration in development mode. OTP: ${otp}`);
@@ -389,7 +389,7 @@ export const sendLoginOTP = async (req, res) => {
     // Check if SMS failed and handle accordingly (same as register)
     if (smsErrorOccurred || !smsSent) {
       // Check if it's a test number (only allow failure for test numbers in development)
-      const isTestNumber = normalizedPhone && ['9993911855'].some(testNum => normalizedPhone.endsWith(testNum));
+      const isTestNumber = isTestPhoneNumber(normalizedPhone);
 
       if (isTestNumber && process.env.NODE_ENV === 'development') {
         console.log(`⚠️ Test number - SMS failed but allowing login in development mode. OTP: ${otp}`);
@@ -517,21 +517,25 @@ export const verifyOTP = async (req, res) => {
 
     // Find OTP record (use normalized phone)
     const identifier = normalizedPhone || email;
+    const isTestNumber = isTestPhoneNumber(normalizedPhone);
+    const testOTP = isTestNumber ? getTestOTP(normalizedPhone) : null;
+    const isMatchingTestOTP = isTestNumber && testOTP && otp === testOTP;
+
     const otpRecord = await OTP.findOne({
       identifier,
       otp,
       isUsed: false,
     }).sort({ createdAt: -1 }); // Get latest OTP
 
-    if (!otpRecord) {
+    if (!otpRecord && !isMatchingTestOTP) {
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP',
       });
     }
 
-    // Check if OTP is expired
-    if (isOTPExpired(otpRecord.expiresAt)) {
+    // Check if OTP is expired (bypass for test numbers using configured test OTP)
+    if (otpRecord && isOTPExpired(otpRecord.expiresAt) && !isMatchingTestOTP) {
       return res.status(400).json({
         success: false,
         message: 'OTP has expired. Please request a new one.',
@@ -539,11 +543,13 @@ export const verifyOTP = async (req, res) => {
     }
 
     // Mark OTP as used
-    otpRecord.isUsed = true;
-    await otpRecord.save();
+    if (otpRecord) {
+      otpRecord.isUsed = true;
+      await otpRecord.save();
+    }
 
     // Check if this is a signup verification (not login)
-    const isSignupVerification = otpRecord.purpose === 'register';
+    const isSignupVerification = otpRecord ? otpRecord.purpose === 'register' : false;
 
     let user;
     let isFirstVerification = false;
@@ -967,7 +973,7 @@ export const resendOTP = async (req, res) => {
 
       // Always return error if SMS fails (even in development for real numbers)
       // Only allow in development if it's a test number
-      const isTestNumber = normalizedPhone && ['9993911855'].some(testNum => normalizedPhone.endsWith(testNum));
+      const isTestNumber = isTestPhoneNumber(normalizedPhone);
 
       if (isTestNumber && process.env.NODE_ENV === 'development') {
         console.log(`⚠️ Test number - SMS failed but allowing resend in development mode. OTP: ${otp}`);
