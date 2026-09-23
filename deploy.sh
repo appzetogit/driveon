@@ -13,13 +13,29 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Absolute directory of this script
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Determine the DriveOn project directory:
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -d "$SCRIPT_DIR/.git" ]; then
+    PROJECT_DIR="$SCRIPT_DIR"
+elif [ -d "$SCRIPT_DIR/driveon/.git" ]; then
+    PROJECT_DIR="$SCRIPT_DIR/driveon"
+elif [ -d "$HOME/driveon/.git" ]; then
+    PROJECT_DIR="$HOME/driveon"
+elif [ -d "/root/driveon/.git" ]; then
+    PROJECT_DIR="/root/driveon"
+else
+    echo -e "${RED}❌ Error: Could not find DriveOn git repository (.git folder)!${NC}"
+    echo -e "Please ensure you run this from the driveon directory:\n  cd ~/driveon && ./deploy.sh"
+    exit 1
+fi
+
 WEB_ROOT="/var/www/driveon"
 
 echo -e "\n${BLUE}======================================================${NC}"
 echo -e "${BLUE}       🚀 Starting DriveOn Full Deployment            ${NC}"
 echo -e "${BLUE}======================================================${NC}\n"
+echo -e "📂 Project directory: ${GREEN}${PROJECT_DIR}${NC}\n"
 
 # ------------------------------------------------------------------------------
 # 1. Pull Latest Code from GitHub
