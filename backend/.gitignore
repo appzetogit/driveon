@@ -26,3 +26,7 @@ Thumbs.db
 config/*firebase*.json
 *.pem
 *.key
+
+# Local uploads storage
+public/uploads/*
+!public/uploads/.gitkeep

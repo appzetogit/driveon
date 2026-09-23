@@ -162,11 +162,13 @@ export const getSocketUrl = () => {
 // --------------------
 export const API_BASE_URL = getApiBaseUrl();
 export const SOCKET_URL = getSocketUrl();
+export const BACKEND_ORIGIN = (API_BASE_URL || '').replace(/\/api\/?$/, '');
 
 // Log for debugging in production (optional)
 if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
   console.log('📡 DriveOn API Initialized at:', API_BASE_URL);
   console.log('🚀 DriveOn Socket Initialized at:', SOCKET_URL);
+  console.log('📁 DriveOn Backend Origin:', BACKEND_ORIGIN);
 }
 
 export default API_BASE_URL;

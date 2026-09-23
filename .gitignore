@@ -32,3 +32,8 @@ build/
 *.key
 *firebase-adminsdk*.json
 backend/config/*firebase*.json
+
+# Local uploads storage
+backend/public/uploads/*
+!backend/public/uploads/.gitkeep
+

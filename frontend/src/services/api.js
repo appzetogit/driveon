@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { store } from '../store/store';
 import { logout, refreshTokenSuccess } from '../store/slices/authSlice';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, BACKEND_ORIGIN } from '../config/api';
+import { resolveUploadsUrls } from '../utils/urlResolver';
+
 
 /**
  * Axios Instance Configuration
@@ -156,8 +158,13 @@ api.interceptors.request.use(
  */
 api.interceptors.response.use(
   (response) => {
+    // Intercept successful API response and resolve relative /uploads paths instantly
+    if (response && response.data) {
+      response.data = resolveUploadsUrls(response.data, BACKEND_ORIGIN);
+    }
+
     // Calculate request duration
-    if (response.config.metadata) {
+    if (response.config && response.config.metadata) {
       const duration = new Date() - response.config.metadata.startTime;
       console.log(`API Request: ${response.config.url} - ${duration}ms`);
     }

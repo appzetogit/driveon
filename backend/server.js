@@ -9,6 +9,15 @@ import Location from "./models/Location.js";
 import User from "./models/User.js";
 import Staff from "./models/Staff.js";
 import "./services/firebase.service.js"; // Initialize Firebase Admin early
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import axios from "axios";
+import { PUBLIC_UPLOADS_DIR, ensureDirectoryExists } from "./services/localStorage.service.js";
+import mediaSyncRoutes from "./routes/mediaSync.routes.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config();
@@ -62,6 +71,56 @@ app.use(
 );
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Ensure public uploads directory exists
+ensureDirectoryExists(PUBLIC_UPLOADS_DIR);
+
+// Serve static assets from local storage
+app.use('/uploads', express.static(PUBLIC_UPLOADS_DIR));
+
+// Smart Fallback Proxy for /uploads: if file is not found locally, fetch it on-demand from live VPS,
+// save it to local disk (caching), and serve it immediately
+app.use('/uploads', async (req, res, next) => {
+  const liveServerUrl = process.env.LIVE_SERVER_URL?.trim();
+  if (!liveServerUrl || liveServerUrl.includes('localhost') || liveServerUrl.includes('127.0.0.1')) {
+    return next();
+  }
+
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return next();
+  }
+
+  const cleanPath = req.path.replace(/^\/+/, '');
+  const localFilePath = path.join(PUBLIC_UPLOADS_DIR, cleanPath);
+
+  if (fs.existsSync(localFilePath)) {
+    return next();
+  }
+
+  try {
+    const remoteUrl = `${liveServerUrl.replace(/\/+$/, '')}/uploads/${cleanPath}`;
+    const response = await axios({
+      method: 'get',
+      url: remoteUrl,
+      responseType: 'arraybuffer',
+      timeout: 10000,
+    });
+
+    if (response.status === 200 && response.data) {
+      ensureDirectoryExists(path.dirname(localFilePath));
+      await fs.promises.writeFile(localFilePath, Buffer.from(response.data));
+      const contentType = response.headers['content-type'] || 'image/jpeg';
+      res.setHeader('Content-Type', contentType);
+      return res.send(Buffer.from(response.data));
+    }
+  } catch (err) {
+    // Proceed to next if not available on remote either
+  }
+  next();
+});
+
+// Serve public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Multer configuration for file uploads
 const storage = multer.memoryStorage(); // Store files in memory for Cloudinary upload
@@ -315,6 +374,7 @@ app.use("/api", userRoutes);
 app.use("/api", locationRoutes);
 app.use("/api", referralRoutes);
 app.use("/api/kyc", kycRoutes);
+app.use("/api/internal", mediaSyncRoutes);
 
 
 // Basic route
@@ -343,25 +403,10 @@ server.listen(PORT, () => {
   console.log(`🔐 Authentication System: Dual Collection Support (User/Staff) Active`);
   console.log(`🔌 Socket.IO enabled for real-time location tracking`);
 
-  // Verify Cloudinary configuration
-  const cloudinaryName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
-  const cloudinaryKey = process.env.CLOUDINARY_API_KEY?.trim();
-  const cloudinarySecret = process.env.CLOUDINARY_API_SECRET?.trim();
-  if (cloudinaryName && cloudinaryKey && cloudinarySecret) {
-    console.log(
-      `✅ Cloudinary configured (Cloud Name: ${cloudinaryName}, API Key: ${cloudinaryKey.substring(0, 8)}...)`
-    );
-  } else {
-    console.warn(`⚠️ Cloudinary not configured:`);
-    console.warn(
-      `   CLOUDINARY_CLOUD_NAME: ${cloudinaryName ? "✓ Set" : "✗ Missing"}`
-    );
-    console.warn(
-      `   CLOUDINARY_API_KEY: ${cloudinaryKey ? "✓ Set" : "✗ Missing"}`
-    );
-    console.warn(
-      `   CLOUDINARY_API_SECRET: ${cloudinarySecret ? "✓ Set" : "✗ Missing"}`
-    );
+  // Verify VPS Storage configuration
+  console.log(`📁 Storage: VPS Local Storage Active (${PUBLIC_UPLOADS_DIR})`);
+  if (process.env.LIVE_SERVER_URL) {
+    console.log(`🔄 Media Sync: Connected with Live Server (${process.env.LIVE_SERVER_URL})`);
   }
 
   // Verify JWT configuration
