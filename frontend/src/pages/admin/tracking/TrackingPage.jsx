@@ -65,7 +65,7 @@ const TrackingPage = () => {
       }
     } catch (e) {
       console.warn('⚠️ Malformed SOCKET_URL detected, using production fallback:', finalSocketUrl);
-      finalSocketUrl = 'https://driveon-19hg.onrender.com';
+      finalSocketUrl = 'https://api.driveoncar.co.in';
     }
 
     console.log('🔌 Attempting socket connection to:', finalSocketUrl);
