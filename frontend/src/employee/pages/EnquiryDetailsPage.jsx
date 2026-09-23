@@ -75,12 +75,20 @@ const EnquiryDetailsPage = () => {
 
     // Header Area
     doc.setFillColor(themeColor);
-    doc.rect(0, 0, 210, 40, 'F'); // A4 Width is 210mm
+    doc.rect(0, 0, 210, 42, 'F'); // A4 Width is 210mm
 
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
-    doc.text("INVOICE", 105, 20, { align: "center" });
+    doc.text("PAYMENT INVOICE", 105, 17, { align: "center" });
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED", 105, 24, { align: "center" });
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("DriveOn Car Rental Platform  |  support@driveon.com", 105, 31, { align: "center" });
 
     // Customer Details
     doc.setTextColor(0, 0, 0);
@@ -128,10 +136,18 @@ const EnquiryDetailsPage = () => {
     doc.text(`INR ${invoice.amount}`, 195, 125, { align: "right" });
 
     // Footer
-    doc.setFontSize(10);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(15, 142, 195, 142);
+
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(28, 32, 92);
+    doc.text("Payment Invoice powered by URBAN MOBILITY RENTALS PRIVATE LIMITED", 105, 148, { align: "center" });
+
+    doc.setFontSize(8);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(100, 100, 100);
-    doc.text("Thank you for your business!", 105, 150, { align: "center" });
+    doc.text("Thank you for your business! This is an official computer-generated payment invoice.", 105, 154, { align: "center" });
     
     // Save PDF
     doc.save(`Invoice_${invoice.number}.pdf`);

@@ -35,9 +35,12 @@ api.interceptors.request.use(
     // Check for specific route types
     const isStrictAdminRoute = config.url?.includes('/admin/');
     const isCrmRoute = config.url?.includes('/crm/');
+    const isStaffRoute = config.url?.includes('/staff-') || config.url?.includes('/staff/');
 
     if (isStrictAdminRoute) {
       token = localStorage.getItem('adminToken');
+    } else if (isStaffRoute) {
+      token = localStorage.getItem('staffToken') || store.getState().auth.token;
     } else if (isCrmRoute) {
       // For CRM, try admin token first, then staff token, then general auth tokens
       // This allows both Admins and Staff to access CRM endpoints

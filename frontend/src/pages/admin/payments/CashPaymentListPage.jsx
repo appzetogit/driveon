@@ -319,13 +319,16 @@ const CashPaymentListPage = () => {
       doc.rect(0, 0, pageW, 28, 'F');
 
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(20);
+      doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('DRIVEON', 14, 12);
+      doc.text('DRIVEON', 14, 11);
 
-      doc.setFontSize(9);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED', 14, 17);
+
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text('Car Rental Management System', 14, 18);
       doc.text('support@driveon.com  |  +91 9876543210', 14, 23);
 
       doc.setFontSize(16);
@@ -403,7 +406,19 @@ const CashPaymentListPage = () => {
         columnStyles: {
           8: { halign: 'right' } // Right align Amount column
         },
-        styles: { fontSize: 8.5, cellPadding: 2.5 }
+        styles: { fontSize: 8.5, cellPadding: 2.5 },
+        didDrawPage: () => {
+          const pg = doc.internal.getCurrentPageInfo().pageNumber;
+          const total = doc.internal.getNumberOfPages();
+          doc.setFontSize(7);
+          doc.setTextColor(150, 150, 150);
+          doc.text(
+            `DriveOn Cash Payments Report  |  Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED  |  Page ${pg} of ${total}`,
+            pageW / 2,
+            doc.internal.pageSize.getHeight() - 5,
+            { align: 'center' }
+          );
+        }
       });
 
       doc.save(`Cash_Payments_Report_${new Date().toISOString().split('T')[0]}.pdf`);

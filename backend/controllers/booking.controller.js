@@ -702,18 +702,16 @@ export const createBooking = async (req, res) => {
     await booking.populate('car', 'brand model year color images pricePerDay');
     await booking.populate('user', 'name phone email age gender address profilePhoto');
 
-    // Notify admins
-    try {
-      await createAdminNotification({
-        title: 'New Booking Created',
-        message: `A new booking (${booking.bookingId}) has been created by ${booking.user?.name || 'User'} for ${booking.car?.brand} ${booking.car?.model}.`,
-        type: 'info',
-        relatedId: booking._id,
-        relatedModel: 'Booking'
-      });
-    } catch (err) {
+    // Notify admins (non-blocking in background)
+    createAdminNotification({
+      title: 'New Booking Created',
+      message: `A new booking (${booking.bookingId}) has been created by ${booking.user?.name || 'User'} for ${booking.car?.brand} ${booking.car?.model}.`,
+      type: 'info',
+      relatedId: booking._id,
+      relatedModel: 'Booking'
+    }).catch(err => {
       console.error('Error sending admin notification for new booking:', err);
-    }
+    });
 
     const enrichedBooking = await enrichSingleBookingWithPromoDetails(booking);
     res.status(201).json({

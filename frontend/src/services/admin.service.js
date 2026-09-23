@@ -389,6 +389,36 @@ export const adminService = {
   },
 
   /**
+   * Delete Booking (Admin)
+   * @param {String} bookingId - Booking ID
+   * @returns {Promise}
+   */
+  deleteBooking: async (bookingId) => {
+    try {
+      const response = await api.delete(`/admin/bookings/${bookingId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete booking (admin) error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Bulk Delete Bookings (Admin)
+   * @param {Array} bookingIds - Array of Booking IDs
+   * @returns {Promise}
+   */
+  deleteBulkBookings: async (bookingIds) => {
+    try {
+      const response = await api.post('/admin/bookings/bulk-delete', { bookingIds });
+      return response.data;
+    } catch (error) {
+      console.error('Bulk delete bookings (admin) error:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Get Active Bookings with Tracking (Admin)
    * @returns {Promise}
    */

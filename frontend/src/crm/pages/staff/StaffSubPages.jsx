@@ -3211,14 +3211,17 @@ export const SalaryPage = () => {
 
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.text("DriveOn CRM", 20, 18);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("Premium Operations Hub & Smart Payroll System", 20, 26);
-    doc.setFontSize(14);
+    doc.setFontSize(20);
+    doc.text("DriveOn CRM", 20, 16);
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
-    doc.text("OFFICIAL SALARY RECEIPT", 130, 24);
+    doc.text("Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED", 20, 23);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Smart Payroll System & Operations Hub", 20, 30);
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text("OFFICIAL SALARY RECEIPT", 125, 24);
 
     // Reset Color
     doc.setTextColor(0, 0, 0);
@@ -3344,10 +3347,15 @@ export const SalaryPage = () => {
     }
 
     // Footnotes
+    doc.setTextColor(28, 32, 92);
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "bold");
+    doc.text("Official Payment Receipt powered by URBAN MOBILITY RENTALS PRIVATE LIMITED", 105, 274, { align: 'center' });
+
     doc.setTextColor(150, 150, 150);
-    doc.setFontSize(8);
-    doc.text("Generated securely via DriveOn Smart Payroll Hub", 105, 275, { align: 'center' });
-    doc.text("This document is computer-generated and holds official validity without physical signatures.", 105, 280, { align: 'center' });
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.text("Generated securely via DriveOn Smart Payroll Hub  |  Valid computer-generated official document", 105, 280, { align: 'center' });
 
     doc.save(`SalarySlip_${item.name.replace(/\s+/g, '_')}_${item.monthString.replace(/\s+/g, '_')}.pdf`);
   };

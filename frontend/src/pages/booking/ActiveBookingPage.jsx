@@ -184,11 +184,12 @@ const ActiveBookingPage = () => {
 
     // Header
     doc.setFillColor(30, 98, 98); // Theme color
-    doc.rect(0, 0, pageWidth, 40, 'F');
-    addText('DRIVEON', margin, 25, 20, true, [255, 255, 255]);
-    addText('Booking Receipt', margin, 35, 12, true, [255, 255, 255]);
+    doc.rect(0, 0, pageWidth, 45, 'F');
+    addText('DRIVEON', margin, 18, 18, true, [255, 255, 255]);
+    addText('Payment Invoice / Booking Receipt', margin, 27, 11, true, [255, 255, 255]);
+    addText('Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED', margin, 36, 8.5, false, [240, 240, 240]);
     
-    yPos = 50;
+    yPos = 55;
 
     // Booking ID
     addText(`Booking ID: ${booking.bookingId || booking.id}`, margin, yPos, 12, true);
@@ -276,10 +277,14 @@ const ActiveBookingPage = () => {
 
     // Footer
     const footerY = pageHeight - 20;
+    doc.setFontSize(8.5);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(30, 98, 98);
+    doc.text('Payment Invoice powered by URBAN MOBILITY RENTALS PRIVATE LIMITED', pageWidth / 2, footerY - 4, { align: 'center' });
     doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
     doc.setTextColor(128, 128, 128);
-    doc.text('Thank you for choosing DriveOn!', pageWidth / 2, footerY, { align: 'center' });
-    doc.text('For support, contact us at support@driveon.com', pageWidth / 2, footerY + 5, { align: 'center' });
+    doc.text('Thank you for choosing DriveOn! | For support, contact us at support@driveon.com', pageWidth / 2, footerY + 2, { align: 'center' });
 
     // Save PDF
     const fileName = `DriveOn_Receipt_${booking.bookingId || booking.id}_${Date.now()}.pdf`;

@@ -282,27 +282,37 @@ const PaymentListPage = () => {
       // Header
       doc.setFont("helvetica", "bold");
       doc.setFontSize(22);
-      doc.setTextColor(33, 37, 41);
-      doc.text("DRIVEON", 10, 20);
+      doc.setTextColor(28, 32, 92);
+      doc.text("DRIVEON", 10, 18);
 
-      doc.setFontSize(10);
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(71, 85, 105);
+      doc.text("URBAN MOBILITY RENTALS PRIVATE LIMITED", 10, 24);
+
+      doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(108, 117, 125);
-      doc.text("123 Business Road, Tech City", 10, 28);
-      doc.text("Email: support@driveon.com", 10, 34);
-      doc.text("Phone: +91 9876543210", 10, 40);
+      doc.text("Email: support@driveon.com  |  Phone: +91 9876543210", 10, 30);
 
       // Title
-      doc.setFontSize(16);
+      doc.setFontSize(15);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(33, 37, 41);
-      doc.text("PAYMENT INVOICE", 105, 20, { align: "center" });
+      doc.setTextColor(28, 32, 92);
+      doc.text("PAYMENT INVOICE", 155, 18, { align: "center" });
+
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(71, 85, 105);
+      doc.text("Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED", 155, 23.5, { align: "center" });
 
       // Invoice Info
-      doc.setFontSize(10);
-      doc.text(`Invoice No: INV-${payment.transactionId.substring(0, 8).toUpperCase()}`, 130, 28);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 130, 34);
-      doc.text(`Status: Paid`, 130, 40);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(33, 37, 41);
+      doc.text(`Invoice No: INV-${payment.transactionId.substring(0, 8).toUpperCase()}`, 125, 30);
+      doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, 125, 35);
+      doc.text(`Status: Paid`, 125, 40);
 
       // Customer Info
       doc.setDrawColor(200, 200, 200);
@@ -348,10 +358,18 @@ const PaymentListPage = () => {
       doc.text(`INR ${payment.amount.toLocaleString()}`, 195, 130, { align: "right" });
 
       // Footer
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "italic");
-      doc.setTextColor(150, 150, 150);
-      doc.text("Thank you for your business!", 105, 150, { align: "center" });
+      doc.setDrawColor(220, 220, 220);
+      doc.line(10, 142, 200, 142);
+
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(28, 32, 92);
+      doc.text("Payment Invoice powered by URBAN MOBILITY RENTALS PRIVATE LIMITED", 105, 148, { align: "center" });
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(130, 130, 130);
+      doc.text("Thank you for your business! This is a computer-generated tax/payment invoice.", 105, 153, { align: "center" });
 
       doc.save(`Invoice_${payment.transactionId}.pdf`);
     }).catch(err => {
@@ -384,13 +402,16 @@ const PaymentListPage = () => {
       doc.rect(0, 0, pageW, 28, 'F');
 
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(20);
+      doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('DRIVEON', 14, 12);
+      doc.text('DRIVEON', 14, 11);
 
-      doc.setFontSize(9);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED', 14, 17);
+
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text('Car Rental Management System', 14, 18);
       doc.text('support@driveon.com  |  +91 9876543210', 14, 23);
 
       doc.setFontSize(16);
@@ -477,7 +498,7 @@ const PaymentListPage = () => {
           doc.setFontSize(7);
           doc.setTextColor(150, 150, 150);
           doc.text(
-            `DriveOn Payment Report  |  Page ${pg} of ${total}`,
+            `DriveOn Payment Report  |  Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED  |  Page ${pg} of ${total}`,
             pageW / 2,
             doc.internal.pageSize.getHeight() - 5,
             { align: 'center' }
@@ -1181,13 +1202,16 @@ const ExportReportModal = ({ payments, stats, filters, onClose }) => {
     doc.rect(0, 0, pageW, 28, 'F');
 
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('DRIVEON', 14, 12);
+    doc.text('DRIVEON', 14, 11);
 
-    doc.setFontSize(9);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED', 14, 17);
+
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text('Car Rental Management System', 14, 18);
     doc.text('support@driveon.com  |  +91 9876543210', 14, 23);
 
     doc.setFontSize(16);
@@ -1256,7 +1280,7 @@ const ExportReportModal = ({ payments, stats, filters, onClose }) => {
         doc.setFontSize(7);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `DriveOn Payment Report  |  Page ${pg} of ${total}`,
+          `DriveOn Payment Report  |  Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED  |  Page ${pg} of ${total}`,
           pageW / 2,
           doc.internal.pageSize.getHeight() - 5,
           { align: 'center' }

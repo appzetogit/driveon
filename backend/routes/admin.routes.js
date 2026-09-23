@@ -50,6 +50,8 @@ import {
   getActiveBookingsWithTracking,
   getBookingStats,
   completeBookingWithPayment,
+  deleteBooking,
+  deleteBulkBookings,
 } from '../controllers/admin.booking.controller.js';
 import {
   sendGuarantorRequest,
@@ -299,6 +301,14 @@ router.patch('/bookings/:id', authenticateAdmin, updateBooking);
 // Complete Booking with Payment Collection - PROTECTED
 // Route: POST /api/admin/bookings/:id/complete
 router.post('/bookings/:id/complete', authenticateAdmin, completeBookingWithPayment);
+
+// Bulk Delete Bookings - PROTECTED
+// Route: POST /api/admin/bookings/bulk-delete
+router.post('/bookings/bulk-delete', authenticateAdmin, deleteBulkBookings);
+
+// Delete Booking - PROTECTED
+// Route: DELETE /api/admin/bookings/:id
+router.delete('/bookings/:id', authenticateAdmin, deleteBooking);
 
 // ============================================
 // GUARANTOR REQUEST MANAGEMENT ROUTES - PROTECTED

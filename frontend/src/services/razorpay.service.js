@@ -53,65 +53,91 @@ class RazorpayService {
       const isAPK = this.isAPKContext();
       console.log('📱 Running in APK context:', isAPK);
 
-      const targetElement = document.head || document.getElementsByTagName('head')[0] || document.body || document.documentElement;
-
-      if (!targetElement) {
-        console.error('❌ No target element found for script injection');
-        reject(new Error('Cannot inject Razorpay script - no DOM element available'));
+      // Check if script tag already exists in the document
+      const existingScript = document.querySelector('script[src*="checkout.razorpay.com"]');
+      if (existingScript) {
+        console.log('📜 Razorpay script tag already in DOM, waiting for Razorpay object...');
+        let attempts = 0;
+        const checkExisting = () => {
+          if (window.Razorpay) {
+            console.log('✅ Razorpay object ready from existing script');
+            resolve();
+          } else if (attempts < 50) {
+            attempts++;
+            setTimeout(checkExisting, 100);
+          } else {
+            console.warn('⚠️ Existing Razorpay script did not initialize in time, attempting re-injection');
+            existingScript.remove();
+            this.injectRazorpayScript(resolve, reject, isAPK);
+          }
+        };
+        checkExisting();
         return;
       }
 
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-
-      const timeout = setTimeout(() => {
-        console.error('❌ Razorpay script load timeout');
-        if (targetElement.contains(script)) {
-          targetElement.removeChild(script);
-        }
-        reject(new Error('Razorpay script loading timeout - please check your internet connection'));
-      }, isAPK ? 12000 : 8000);
-
-      script.onload = () => {
-        clearTimeout(timeout);
-        console.log('✅ Razorpay script loaded successfully');
-
-        const checkRazorpay = (attempt = 0) => {
-          if (window.Razorpay) {
-            console.log('✅ Razorpay object available');
-            resolve();
-          } else if (attempt < 20) {
-            const delay = attempt === 0 ? 50 : 100;
-            setTimeout(() => checkRazorpay(attempt + 1), delay);
-          } else {
-            console.error('❌ window.Razorpay not available after script load');
-            reject(new Error('Razorpay object not available'));
-          }
-        };
-
-        checkRazorpay(0);
-      };
-
-      script.onerror = (error) => {
-        clearTimeout(timeout);
-        console.error('❌ Failed to load Razorpay script:', error);
-        if (targetElement.contains(script)) {
-          targetElement.removeChild(script);
-        }
-        reject(new Error('Failed to load Razorpay script. Please check your internet connection.'));
-      };
-
-      try {
-        targetElement.appendChild(script);
-        console.log('📜 Razorpay script element added to DOM');
-      } catch (error) {
-        clearTimeout(timeout);
-        console.error('❌ Failed to append script:', error);
-        reject(new Error('Failed to inject Razorpay script'));
-      }
+      this.injectRazorpayScript(resolve, reject, isAPK);
     });
+  }
+
+  injectRazorpayScript(resolve, reject, isAPK) {
+    const targetElement = document.head || document.getElementsByTagName('head')[0] || document.body || document.documentElement;
+
+    if (!targetElement) {
+      console.error('❌ No target element found for script injection');
+      reject(new Error('Cannot inject Razorpay script - no DOM element available'));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+
+    const timeout = setTimeout(() => {
+      console.error('❌ Razorpay script load timeout');
+      if (targetElement.contains(script)) {
+        targetElement.removeChild(script);
+      }
+      reject(new Error('Razorpay script loading timeout - please check your internet connection'));
+    }, isAPK ? 30000 : 25000);
+
+    script.onload = () => {
+      clearTimeout(timeout);
+      console.log('✅ Razorpay script loaded successfully');
+
+      const checkRazorpay = (attempt = 0) => {
+        if (window.Razorpay) {
+          console.log('✅ Razorpay object available');
+          resolve();
+        } else if (attempt < 30) {
+          const delay = attempt === 0 ? 50 : 100;
+          setTimeout(() => checkRazorpay(attempt + 1), delay);
+        } else {
+          console.error('❌ window.Razorpay not available after script load');
+          reject(new Error('Razorpay object not available'));
+        }
+      };
+
+      checkRazorpay(0);
+    };
+
+    script.onerror = (error) => {
+      clearTimeout(timeout);
+      console.error('❌ Failed to load Razorpay script:', error);
+      if (targetElement.contains(script)) {
+        targetElement.removeChild(script);
+      }
+      reject(new Error('Failed to load Razorpay script. Please check your internet connection.'));
+    };
+
+    try {
+      targetElement.appendChild(script);
+      console.log('📜 Razorpay script element added to DOM');
+    } catch (error) {
+      clearTimeout(timeout);
+      console.error('❌ Failed to append script:', error);
+      reject(new Error('Failed to inject Razorpay script'));
+    }
   }
 
   /**

@@ -166,13 +166,13 @@ const BookingsPage = () => {
       <div className="flex-1 overflow-y-auto pb-32 scrollbar-hide">
         <div className="relative z-30">
           {/* HEADER BACKGROUND */}
-          <div className="bg-[#1C205C] pb-8 rounded-b-[40px] shadow-lg relative overflow-hidden z-0">
+          <div className="bg-[#1C205C] pb-4 rounded-b-[26px] shadow-md relative overflow-hidden z-0">
             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none"></div>
 
-            <div className="pt-6 px-4">
-              <HeaderTopBar title="My Assigned Trips" />
-              <div className="mt-2 text-center text-blue-100/80 text-sm font-semibold">
+            <div className="pt-4 px-4">
+              <HeaderTopBar title="My Assigned Trips" className="mb-0.5" />
+              <div className="mt-0.5 text-center text-blue-100/80 text-xs font-medium">
                 Manage and execute your scheduled bookings
               </div>
             </div>
@@ -180,7 +180,7 @@ const BookingsPage = () => {
         </div>
 
         {/* Dynamic Navigation Tabs */}
-        <div className="px-6 mt-6 flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 z-20 relative">
+        <div className="px-6 mt-4 flex gap-1.5 overflow-x-auto scrollbar-hide pb-1 z-20 relative">
           {['All', 'Not Started', 'Ongoing', 'Completed'].map((tab) => (
             <button
               key={tab}
@@ -220,23 +220,25 @@ const BookingsPage = () => {
                   className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all space-y-4 relative overflow-hidden"
                 >
                   {/* Top Header Card */}
-                  <div className="flex justify-between items-start border-b border-gray-50 pb-3">
+                  <div className="flex justify-between items-start border-b border-gray-50 pb-2">
                     <div>
                       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Booking reference</span>
                       <h4 className="font-extrabold text-[#1C205C] text-sm mt-0.5">#{booking.bookingId}</h4>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {tripDays && (
-                        <span className="inline-flex items-center gap-1 mt-1 text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-black">
+                        <span className="inline-flex items-center gap-1 text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-1 rounded-full font-black whitespace-nowrap">
                           <FiClock size={9} /> {tripDays} {tripDays === 1 ? 'Day' : 'Days'}
                         </span>
                       )}
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black border uppercase tracking-wider whitespace-nowrap ${statusInfo.color}`}>
+                        {statusInfo.text}
+                      </span>
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black border uppercase tracking-wider ${statusInfo.color}`}>
-                      {statusInfo.text}
-                    </span>
                   </div>
 
                   {/* Customer Information Section */}
-                  <div className="flex items-center justify-between bg-gray-50/70 p-3 rounded-2xl border border-gray-100/50">
+                  <div className="flex items-center justify-between bg-gray-50/70 p-3 rounded-2xl border border-gray-100/50 !mt-2.5" style={{ marginTop: '9px' }}>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-purple-50 text-[#1C205C] flex items-center justify-center font-black">
                         <FiUser size={16} />

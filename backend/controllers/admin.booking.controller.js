@@ -5,6 +5,7 @@ import User from '../models/User.js';
 import Transaction from '../models/Transaction.js';
 import Coupon from '../models/Coupon.js';
 import Offer from '../models/Offer.js';
+import GuarantorRequest from '../models/GuarantorRequest.js';
 import { reverseGuarantorPoints, refundUsedBookingPoints } from '../utils/guarantorPoints.js';
 import { sendPushNotification } from '../services/firebase.service.js';
 
@@ -782,6 +783,84 @@ export const completeBookingWithPayment = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to complete booking',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+/**
+ * @desc    Delete single booking (Admin)
+ * @route   DELETE /api/admin/bookings/:id
+ * @access  Private (Admin)
+ */
+export const deleteBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found',
+      });
+    }
+
+    // Clean up any associated GuarantorRequest
+    await GuarantorRequest.deleteMany({ booking: id }).catch(() => {});
+
+    // Delete the booking
+    await Booking.findByIdAndDelete(id);
+
+    res.json({
+      success: true,
+      message: 'Booking deleted successfully',
+      data: { id },
+    });
+  } catch (error) {
+    console.error('Delete booking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete booking',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+/**
+ * @desc    Delete multiple bookings in bulk (Admin)
+ * @route   POST /api/admin/bookings/bulk-delete
+ * @access  Private (Admin)
+ */
+export const deleteBulkBookings = async (req, res) => {
+  try {
+    const { bookingIds } = req.body;
+
+    if (!bookingIds || !Array.isArray(bookingIds) || bookingIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an array of booking IDs to delete',
+      });
+    }
+
+    // Clean up associated GuarantorRequests
+    await GuarantorRequest.deleteMany({ booking: { $in: bookingIds } }).catch(() => {});
+
+    // Delete bookings
+    const result = await Booking.deleteMany({ _id: { $in: bookingIds } });
+
+    res.json({
+      success: true,
+      message: `${result.deletedCount} booking(s) deleted successfully`,
+      data: {
+        deletedCount: result.deletedCount,
+        bookingIds,
+      },
+    });
+  } catch (error) {
+    console.error('Delete bulk bookings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete selected bookings',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }

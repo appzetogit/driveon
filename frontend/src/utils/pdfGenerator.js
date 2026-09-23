@@ -81,34 +81,41 @@ export const generateBookingPDF = (bookingData) => {
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, pageWidth, 5, 'F');
 
-  let yPosition = 18;
+  let yPosition = 16;
 
   // Company Name
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...primaryColor);
   doc.text('DRIVE ON', pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 6;
+  yPosition += 5;
 
   // Tagline
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(100, 116, 139); // slate-500
   doc.text('Premium Car Rental Services', pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 8;
+  yPosition += 6;
 
   // Divider Line
   doc.setDrawColor(...borderGray);
   doc.setLineWidth(0.5);
   doc.line(margin, yPosition, pageWidth - margin, yPosition);
-  yPosition += 6;
+  yPosition += 5.5;
 
-  // Title: BOOKING RECEIPT
-  doc.setFontSize(14);
+  // Title: PAYMENT INVOICE & BOOKING RECEIPT
+  doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...primaryColor);
-  doc.text('BOOKING RECEIPT', pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 8;
+  doc.text('PAYMENT INVOICE & BOOKING RECEIPT', pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 4.5;
+
+  // Powered By Subtitle
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...primaryColor);
+  doc.text('Payment Invoice powered by URBAN MOBILITY RENTALS PRIVATE LIMITED', pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 7;
 
   // Booking ID & Generation Info Box
   const infoBoxY = yPosition;
@@ -416,29 +423,24 @@ export const generateBookingPDF = (bookingData) => {
   }
 
   // ========== FOOTER SECTION ==========
-  const footerY = pageHeight - 28;
+  const footerY = pageHeight - 24;
 
   // Thin separator for footer
   doc.setDrawColor(...borderGray);
   doc.setLineWidth(0.3);
   doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
 
-  // Company Name
+  // Powered by legal entity
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...primaryColor);
-  doc.text('DRIVE ON', pageWidth / 2, footerY, { align: 'center' });
+  doc.text('Payment Invoice powered by URBAN MOBILITY RENTALS PRIVATE LIMITED', pageWidth / 2, footerY, { align: 'center' });
 
-  // Address Details
+  // Address & Support Details
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139); // slate-500
-
-
-  // Safety/Mandatory Warning
-  doc.setFontSize(7.5);
-  doc.setFont('helvetica', 'bolditalic');
-  doc.setTextColor(220, 38, 38); // Warning Red
+  doc.text('DRIVE ON Car Rental Services  |  Support: support@driveon.com  |  Official Computer-Generated Receipt', pageWidth / 2, footerY + 4.5, { align: 'center' });
 
   // Strict 1-Page receipt naming
   const fileName = `Booking_${bookingData.bookingId || 'Receipt'}.pdf`;
@@ -453,19 +455,26 @@ export const generateBookingPDF = (bookingData) => {
 export const generateAllBookingsPDF = (bookings, stats) => {
   const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for tabular data
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
 
   // Header
   doc.setFontSize(20);
   doc.setTextColor(28, 32, 92);
-  doc.text('DriveOn - Bookings Report', pageWidth / 2, 20, { align: 'center' });
+  doc.text('DriveOn - Bookings Report', pageWidth / 2, 17, { align: 'center' });
 
-  doc.setFontSize(10);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(28, 32, 92);
+  doc.text('Powered by URBAN MOBILITY RENTALS PRIVATE LIMITED', pageWidth / 2, 23, { align: 'center' });
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, pageWidth / 2, 28, { align: 'center' });
+  doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, pageWidth / 2, 29, { align: 'center' });
 
   // Stats Summary
   if (stats) {
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setTextColor(15, 23, 42);
     doc.text(`Total Bookings: ${stats.total || 0}   |   Confirmed: ${stats.confirmed || 0}   |   Completed: ${stats.completed || 0}   |   Revenue: Rs. ${(stats.totalRevenue || 0).toLocaleString('en-IN')}`, 14, 40);
   }
@@ -495,6 +504,11 @@ export const generateAllBookingsPDF = (bookings, stats) => {
     styles: { fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: [28, 32, 92], textColor: 255, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [248, 250, 252] },
+    didDrawPage: () => {
+      doc.setFontSize(7.5);
+      doc.setTextColor(150, 150, 150);
+      doc.text('Report powered by URBAN MOBILITY RENTALS PRIVATE LIMITED  |  DriveOn Fleet Management', pageWidth / 2, pageHeight - 5, { align: 'center' });
+    }
   });
 
   doc.save(`DriveOn_Bookings_Report_${new Date().toISOString().split('T')[0]}.pdf`);

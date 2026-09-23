@@ -76,24 +76,39 @@ export const EmployeeProvider = ({ children }) => {
 
   // Notification Sync & Listener
   useEffect(() => {
+    const staffToken = localStorage.getItem('staffToken');
+    const isEmployee = Boolean(staffToken) ||
+      window.location.pathname.startsWith('/employee') ||
+      Boolean(user?.employeeId) ||
+      user?.role === 'staff' ||
+      user?.role === 'driver' ||
+      user?.role === 'employee';
+
+    // Only run employee notifications and staff FCM registration for actual staff/employees
+    if (!isEmployee) {
+      return;
+    }
+
     if (user && (user._id || user.id)) {
       fetchUnreadCount();
 
-      // Request and Save Token
-      requestForToken().then(async (token) => {
-        if (token) {
-          const platform = isMobileApp() ? 'mobile' : 'web';
-          try {
-            await api.post('/auth/staff-fcm-token', {
-              fcmToken: token,
-              platform: platform
-            });
-            console.log(`FCM Token saved for staff (${platform})`);
-          } catch (error) {
-            console.error("Error saving FCM token:", error);
+      // Request and Save Token only if staffToken exists
+      if (staffToken) {
+        requestForToken().then(async (token) => {
+          if (token) {
+            const platform = isMobileApp() ? 'mobile' : 'web';
+            try {
+              await api.post('/auth/staff-fcm-token', {
+                fcmToken: token,
+                platform: platform
+              });
+              console.log(`FCM Token saved for staff (${platform})`);
+            } catch (error) {
+              console.error("Error saving FCM token:", error);
+            }
           }
-        }
-      });
+        });
+      }
 
       // Listen for foreground messages
       const unsubscribe = onMessageListener((payload) => {
@@ -219,6 +234,16 @@ export const EmployeeProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    const staffToken = localStorage.getItem('staffToken');
+    const isEmployee = Boolean(staffToken) ||
+      window.location.pathname.startsWith('/employee') ||
+      Boolean(user?.employeeId) ||
+      user?.role === 'staff' ||
+      user?.role === 'driver' ||
+      user?.role === 'employee';
+
+    if (!isEmployee) return;
+
     const staffId = user?._id || user?.id;
     if (staffId) {
       syncTodayAttendanceStatus(staffId);
@@ -239,10 +264,20 @@ export const EmployeeProvider = ({ children }) => {
         setStartTime(null);
         setElapsedSeconds(0);
         
-        // Fetch new day status
-        const staffId = user?._id || user?.id;
-        if (staffId) {
-          syncTodayAttendanceStatus(staffId);
+        // Fetch new day status for employees
+        const staffToken = localStorage.getItem('staffToken');
+        const isEmployee = Boolean(staffToken) ||
+          window.location.pathname.startsWith('/employee') ||
+          Boolean(user?.employeeId) ||
+          user?.role === 'staff' ||
+          user?.role === 'driver' ||
+          user?.role === 'employee';
+
+        if (isEmployee) {
+          const staffId = user?._id || user?.id;
+          if (staffId) {
+            syncTodayAttendanceStatus(staffId);
+          }
         }
       }
     }, 30000); // Check every 30 seconds for quick transition
