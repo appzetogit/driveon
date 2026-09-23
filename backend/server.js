@@ -59,13 +59,30 @@ const allowedOrigins = [
   "http://localhost:5000",
   "https://driveoncar.co.in",
   "https://www.driveoncar.co.in",
+  "http://driveoncar.co.in",
+  "http://www.driveoncar.co.in",
   process.env.FRONTEND_URL
 ].filter(Boolean);
+
+const corsOriginDelegate = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  if (allowedOrigins.includes(origin)) return callback(null, true);
+  try {
+    const url = new URL(origin);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      return callback(null, true);
+    }
+    if (url.hostname.endsWith('driveoncar.co.in')) {
+      return callback(null, true);
+    }
+  } catch (e) {}
+  callback(null, false);
+};
 
 // Middleware
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: corsOriginDelegate,
     credentials: true,
   })
 );
@@ -77,6 +94,7 @@ ensureDirectoryExists(PUBLIC_UPLOADS_DIR);
 
 // Serve static assets from local storage
 app.use('/uploads', express.static(PUBLIC_UPLOADS_DIR));
+app.use('/api/uploads', express.static(PUBLIC_UPLOADS_DIR));
 
 // Smart Fallback Proxy for /uploads: if file is not found locally, fetch it on-demand from live VPS,
 // save it to local disk (caching), and serve it immediately
@@ -183,7 +201,7 @@ import kycRoutes from "./routes/kyc.routes.js";
 // ---------- Socket.IO ----------
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: corsOriginDelegate,
     methods: ["GET", "POST"],
     credentials: true,
   },

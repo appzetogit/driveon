@@ -1,89 +1,56 @@
 /**
  * API Configuration
- * Centralized base URL configuration for backend API calls
- * ✅ Updated for safe Socket.IO URL
+ * Centralized base URL configuration for backend API calls & WebSockets
+ * Dynamic origin resolution ensures production works automatically on any domain/subdomain
  */
 
 // --------------------
 // 1️⃣ Get Base URL for API
-// Priority: 
-// 1. Localhost (Dev)
-// 2. Environment Variable
-// 3. Production Fallback
 // --------------------
 const getApiBaseUrl = () => {
-  // 1️⃣ Development localhost check (Absolute priority)
+  // Browser environment
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
+
+    // Localhost / Development
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:5000/api';
+      const localEnv = (import.meta.env.VITE_API_BASE_URL || '').trim();
+      return (localEnv && (localEnv.includes('localhost') || localEnv.includes('127.0.0.1')))
+        ? localEnv
+        : 'http://localhost:5000/api';
     }
+
+    // Production environment variable (if explicitly set and not pointing to localhost)
+    const envUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+    if (envUrl && envUrl.includes('://') && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+      return envUrl.endsWith('/api') ? envUrl : `${envUrl.replace(/\/+$/, '')}/api`;
+    }
+
+    // Default production: always route to /api on the current origin (reverse proxied via Nginx)
+    return `${window.location.origin}/api`;
   }
 
-  // 2️⃣ Environment Variable
-  const envUrl = (import.meta.env.VITE_API_BASE_URL || "").trim();
-  if (envUrl && envUrl.includes('://')) {
-    try {
-      const url = new URL(envUrl);
-      const host = url.hostname.toLowerCase();
-
-      // Ignore broken/malformed env vars
-      if (host !== 'https' && host !== 'http' && host !== 'undefined' && host.length > 3) {
-        return envUrl;
-      }
-    } catch (e) {
-      // malformed
-    }
-  }
-
-  // 3️⃣ Production fallback
-  return 'https://driveoncar.co.in';
+  // SSR / fallback
+  return 'https://driveoncar.co.in/api';
 };
 
 // --------------------
 // 2️⃣ Get Socket.IO URL
-// Safe sanitization to prevent wss://https errors
 // --------------------
 export const getSocketUrl = () => {
-  const apiUrl = getApiBaseUrl();
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
 
-  // If localhost, return localhost socket
-  if (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
-    return 'http://localhost:5000';
-  }
-
-  // SPECIAL FIX: If apiUrl points to the frontend proxy (www.driveoncar.co.in),
-  // force the socket to connect directly to the backend subdomain (api.driveoncar.co.in).
-  // Vercel does not proxy WebSockets efficiently, so we must connect directly.
-  if (apiUrl.includes('driveoncar.co.in')) {
-    return 'https://api.driveoncar.co.in';
-  }
-
-  // If apiUrl invalid, fallback to backend subdomain
-  if (!apiUrl || !apiUrl.includes('://')) {
-    return 'https://api.driveoncar.co.in';
-  }
-
-  // Remove /api at the end and trailing slashes
-  let socketUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
-
-  // Remove duplicate protocols like https://https://
-  socketUrl = socketUrl.replace(/^(https?:\/\/)+/, '$1');
-
-  // Validate final URL
-  try {
-    const url = new URL(socketUrl);
-
-    // Prevent malformed hostnames like 'https' or 'http'
-    if (!url.hostname || ['https', 'http', 'undefined'].includes(url.hostname.toLowerCase())) {
-      throw new Error('Malformed hostname');
+    // Localhost / Development
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:5000';
     }
 
-    return url.origin;
-  } catch (e) {
-    // Fallback safe
-    return 'https://api.driveoncar.co.in';
+    // In production, connect directly to the current website origin
+    return window.location.origin;
   }
+
+  return 'https://driveoncar.co.in';
 };
 
 // --------------------
@@ -93,7 +60,7 @@ export const API_BASE_URL = getApiBaseUrl();
 export const SOCKET_URL = getSocketUrl();
 export const BACKEND_ORIGIN = (API_BASE_URL || '').replace(/\/api\/?$/, '');
 
-// Log for debugging in production (optional)
+// Log for debugging in production
 if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
   console.log('📡 DriveOn API Initialized at:', API_BASE_URL);
   console.log('🚀 DriveOn Socket Initialized at:', SOCKET_URL);
