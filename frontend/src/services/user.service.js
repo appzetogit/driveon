@@ -1,0 +1,429 @@
+// Mock mode - No backend API calls, works offline for frontend design
+const MOCK_MODE = false; // Backend is ready - using actual API calls
+
+// Mock delay to simulate API call
+const mockDelay = (ms = 1000) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * User Service
+ * Mock mode: Simulates API calls without backend
+ * Production mode: Makes actual API calls
+ */
+
+export const userService = {
+  /**
+   * Get user profile
+   * @returns {Promise}
+   */
+  getProfile: async () => {
+    if (MOCK_MODE) {
+      await mockDelay(500);
+      return {
+        user: {
+          id: 'mock_user',
+          name: '',
+          email: '',
+          phone: '',
+          profilePhoto: null,
+        },
+      };
+    }
+
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+
+      console.log('📡 userService.getProfile - Making API call to:', API_ENDPOINTS.USER.PROFILE);
+      const response = await api.get(API_ENDPOINTS.USER.PROFILE);
+
+      console.log('📡 userService.getProfile - Raw axios response:', response);
+      console.log('📡 userService.getProfile - response.status:', response.status);
+      console.log('📡 userService.getProfile - response.data:', response.data);
+      console.log('📡 userService.getProfile - response.data.success:', response.data?.success);
+      console.log('📡 userService.getProfile - response.data.data:', response.data?.data);
+      console.log('📡 userService.getProfile - response.data.data.user:', response.data?.data?.user);
+
+      // Backend returns: { success: true, data: { user: {...} } }
+      // Axios wraps it in response.data, so response.data = { success: true, data: { user: {...} } }
+      // Return the full response.data so components can extract user data properly
+      if (!response.data) {
+        console.error('❌ userService.getProfile - No data in response');
+        throw new Error('No data received from server');
+      }
+
+      if (!response.data.success) {
+        console.error('❌ userService.getProfile - API returned success: false');
+        console.error('❌ Error message:', response.data.message);
+        throw new Error(response.data.message || 'Failed to fetch profile');
+      }
+
+      console.log('✅ userService.getProfile - Successfully received response');
+      return response.data;
+    } catch (error) {
+      console.error('Get profile error:', error);
+      console.error('Get profile error response:', error.response);
+      throw error;
+    }
+  },
+
+  /**
+   * Get staff profile
+   * @returns {Promise}
+   */
+  getStaffProfile: async () => {
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+
+      console.log('📡 userService.getStaffProfile - Making API call to:', API_ENDPOINTS.AUTH.STAFF_PROFILE);
+      const response = await api.get(API_ENDPOINTS.AUTH.STAFF_PROFILE);
+
+      if (!response.data) {
+        throw new Error('No data received from server');
+      }
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to fetch staff profile');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Get staff profile error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update user profile
+   * @param {Object} data - Profile data
+   * @returns {Promise}
+   */
+  updateProfile: async (data) => {
+    if (MOCK_MODE) {
+      await mockDelay(800);
+      return {
+        user: {
+          ...data,
+          id: 'mock_user',
+        },
+        success: true,
+      };
+    }
+
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.put(API_ENDPOINTS.USER.UPDATE_PROFILE, data);
+      return response.data;
+    } catch (error) {
+      console.error('Update profile error:', error);
+
+      // Enhance error with user-friendly message
+      if (error.isNetworkError || error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+        const enhancedError = new Error(
+          error.message || 'Unable to connect to server. Please check your internet connection or try again later.'
+        );
+        enhancedError.code = error.code;
+        enhancedError.isNetworkError = true;
+        throw enhancedError;
+      }
+
+      throw error;
+    }
+  },
+
+  /**
+   * Get KYC status
+   * @returns {Promise}
+   */
+  getKYCStatus: async () => {
+    if (MOCK_MODE) {
+      await mockDelay(500);
+      return {
+        aadhaarVerified: false,
+        panVerified: false,
+        drivingLicenseVerified: false,
+      };
+    }
+
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.get(API_ENDPOINTS.USER.KYC_STATUS);
+      return response.data;
+    } catch (error) {
+      console.error('Get KYC status error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Upload profile photo
+   * @param {FormData} formData - Form data with image
+   * @returns {Promise}
+   */
+  uploadPhoto: async (formData) => {
+    if (MOCK_MODE) {
+      await mockDelay(1000);
+      // Create a mock URL from the file (data URL)
+      const file = formData.get('photo') || formData.get('file') || formData.get('image');
+
+      if (file instanceof File) {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const mockUrl = reader.result; // This will be a data URL
+            resolve({
+              profilePhoto: mockUrl,
+              photo: mockUrl,
+              imageUrl: mockUrl,
+              url: mockUrl,
+              success: true,
+            });
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // Fallback if file not found
+      return {
+        profilePhoto: 'mock_photo_url',
+        success: true,
+      };
+    }
+
+    try {
+      // Production mode - actual API call
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+
+      // Don't set Content-Type header - let axios/browser set it with boundary
+      // The API interceptor will handle adding the Authorization header
+      const response = await api.post(API_ENDPOINTS.USER.UPLOAD_PHOTO, formData);
+      return response.data;
+    } catch (error) {
+      console.error('Upload photo error:', error);
+
+      // Provide user-friendly error messages
+      if (error.response?.status === 401) {
+        const errorMessage = error.response?.data?.message || 'Authentication failed. Please log in again.';
+        const authError = new Error(errorMessage);
+        authError.code = 'AUTH_ERROR';
+        authError.status = 401;
+        throw authError;
+      }
+
+      throw error;
+    }
+  },
+
+  /**
+   * Upload RC document
+   * @param {FormData} formData - Form data with document
+   * @returns {Promise}
+   */
+  uploadRcDocument: async (formData) => {
+    if (MOCK_MODE) {
+      await mockDelay(1000);
+      const file = formData.get('rcDocument') || formData.get('file');
+      if (file instanceof File) {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            resolve({
+              success: true,
+              data: {
+                rcDocument: reader.result
+              }
+            });
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+      return { success: true };
+    }
+
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.post(API_ENDPOINTS.USER.UPLOAD_RC_DOCUMENT, formData);
+      return response.data;
+    } catch (error) {
+      console.error('Upload RC document error:', error);
+      if (error.response?.status === 401) {
+        throw error; // Let component handle auth errors
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Get My Guarantor Requests
+   * @returns {Promise}
+   */
+  getMyGuarantorRequests: async () => {
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.get(API_ENDPOINTS.USER.GUARANTOR_REQUESTS || '/user/guarantor-requests');
+      return response.data;
+    } catch (error) {
+      console.error('Get guarantor requests error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get Guarantor Request Details
+   * @param {String} requestId - Request ID
+   * @returns {Promise}
+   */
+  getGuarantorRequestDetails: async (requestId) => {
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.get(`${API_ENDPOINTS.USER.GUARANTOR_REQUESTS || '/user/guarantor-requests'}/${requestId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Get guarantor request details error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Accept Guarantor Request
+   * @param {String} requestId - Request ID
+   * @returns {Promise}
+   */
+  acceptGuarantorRequest: async (requestId) => {
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.post(`${API_ENDPOINTS.USER.GUARANTOR_REQUESTS || '/user/guarantor-requests'}/${requestId}/accept`);
+      return response.data;
+    } catch (error) {
+      console.error('Accept guarantor request error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Reject Guarantor Request
+   * @param {String} requestId - Request ID
+   * @param {String} reason - Rejection reason (optional)
+   * @returns {Promise}
+   */
+  rejectGuarantorRequest: async (requestId, reason) => {
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.post(`${API_ENDPOINTS.USER.GUARANTOR_REQUESTS || '/user/guarantor-requests'}/${requestId}/reject`, { reason });
+      return response.data;
+    } catch (error) {
+      console.error('Reject guarantor request error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get Guarantor Points and History
+   * @returns {Promise}
+   */
+  getGuarantorPoints: async () => {
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.get(API_ENDPOINTS.USER.GUARANTOR_POINTS || '/user/guarantor-points');
+      return response.data;
+    } catch (error) {
+      console.error('Get guarantor points error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Change user password
+   * @param {Object} data - Password data (currentPassword, newPassword)
+   * @returns {Promise}
+   */
+  changePassword: async (data) => {
+    if (MOCK_MODE) {
+      await mockDelay(800);
+      return {
+        success: true,
+        message: 'Password changed successfully',
+      };
+    }
+
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.put(API_ENDPOINTS.USER.CHANGE_PASSWORD, data);
+      return response.data;
+    } catch (error) {
+      console.error('Change password error:', error);
+
+      // Enhance error with user-friendly message
+      if (error.isNetworkError || error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
+        const enhancedError = new Error(
+          error.message || 'Unable to connect to server. Please check your internet connection or try again later.'
+        );
+        enhancedError.code = error.code;
+        enhancedError.isNetworkError = true;
+        throw enhancedError;
+      }
+
+      throw error;
+    }
+  },
+
+  /**
+   * Send Returning Notification
+   * @param {String} bookingId
+   * @returns {Promise}
+   */
+  sendReturningNotification: async (bookingId) => {
+    try {
+      const api = (await import('./api')).default;
+      const response = await api.post('/user/notify-returning', { bookingId });
+      return response.data;
+    } catch (error) {
+      console.error("Notify error:", error);
+      throw error;
+    }
+  },
+  /**
+   * Delete user account (Soft delete)
+   * @returns {Promise}
+   */
+  deleteAccount: async () => {
+    try {
+      const api = (await import('./api')).default;
+      const { API_ENDPOINTS } = await import('../constants');
+      const response = await api.delete(API_ENDPOINTS.USER.PROFILE || '/user/profile');
+      return response.data;
+    } catch (error) {
+      console.error('Delete account error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update notification preferences (push / email)
+   * @param {{ push?: boolean, email?: boolean }} data
+   * @returns {Promise}
+   */
+  updateNotificationPreferences: async (data) => {
+    try {
+      const api = (await import('./api')).default;
+      const response = await api.put('/user/notification-preferences', data);
+      return response.data;
+    } catch (error) {
+      console.error('Update notification preferences error:', error);
+      throw error;
+    }
+  },
+};
+
+export default userService;
+

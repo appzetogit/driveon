@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+/* ===== iOS / WebView / Cross-Platform Compatibility Fixes ===== */
+
+/* iOS Safari & WebView height fix */
+html {
+  height: -webkit-fill-available;
+  height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available; /* iOS Safari fix */
+  min-height: 100dvh;                 /* Dynamic Viewport Height (modern browsers) */
+  -webkit-text-size-adjust: 100%;     /* Prevent iOS font inflation */
+  -webkit-tap-highlight-color: transparent; /* Remove iOS tap flash */
+  overscroll-behavior-y: none;        /* Prevent iOS bounce on body */
+}
+
+#root {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+}
+
+/* Safe area insets for iPhone notch / Dynamic Island / Home Bar */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Full-screen page containers */
+.app-container {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Fix for iOS WebView where position:fixed can flicker */
+.ios-fixed-bottom {
+  position: fixed;
+  bottom: 0;
+  bottom: env(safe-area-inset-bottom, 0);
+  left: 0;
+  right: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Smooth scrolling for iOS */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent text selection issues on iOS */
+button, a {
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+/* Fix for iOS WebView animation blank screen flash */
+* {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}

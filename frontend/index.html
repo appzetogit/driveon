@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!-- Mobile-First Viewport Configuration -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#1C205C" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- Apple / iOS Specific Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DriveOn" />
+    <meta name="format-detection" content="telephone=no" />
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="DriveOn - Premium Car Rental App. Book cars easily, anytime, anywhere." />
+    <meta name="robots" content="index, follow" />
+    <!-- Open Graph for social sharing -->
+    <meta property="og:title" content="DriveOn - Car Rental App" />
+    <meta property="og:description" content="Premium Car Rental. Book cars easily, anytime, anywhere." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://driveoncar.co.in" />
+    <!-- Preconnect to Google Fonts for better performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <title>DriveOn - Car Rental App</title>
+    <!-- iOS Service Worker Safety Polyfill -->
+    <!-- Prevents app crash on iOS WebViews/Google App where serviceWorker may be restricted -->
+    <script>
+      (function() {
+        if (typeof navigator !== 'undefined' && !navigator.serviceWorker) {
+          try {
+            Object.defineProperty(navigator, 'serviceWorker', {
+              configurable: true,
+              enumerable: true,
+              value: {
+                register: function() { return Promise.resolve({}); },
+                addEventListener: function() {},
+                removeEventListener: function() {},
+                ready: Promise.resolve({ active: {} }),
+                getRegistration: function() { return Promise.resolve(null); },
+                getRegistrations: function() { return Promise.resolve([]); }
+              }
+            });
+          } catch(e) { console.warn('[SW Polyfill]', e); }
+        }
+        // iOS localStorage safety check
+        try {
+          localStorage.setItem('__ls_test__', '1');
+          localStorage.removeItem('__ls_test__');
+        } catch(e) {
+          // localStorage blocked (private mode iOS) - provide no-op fallback
+          var noopStorage = { getItem: function(){return null;}, setItem: function(){}, removeItem: function(){}, clear: function(){} };
+          try { Object.defineProperty(window, 'localStorage', { value: noopStorage }); } catch(e2) {}
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

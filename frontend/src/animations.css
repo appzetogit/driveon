@@ -1,0 +1,199 @@
+@layer utilities {
+    @keyframes float {
+
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-20px);
+        }
+    }
+
+    @keyframes float-slow {
+
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-30px);
+        }
+    }
+
+    @keyframes float-slower {
+
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-40px);
+        }
+    }
+
+    @keyframes breathe {
+
+        0%,
+        100% {
+            transform: scale(1);
+            opacity: 0.5;
+        }
+
+        50% {
+            transform: scale(1.05);
+            opacity: 0.8;
+        }
+    }
+
+    .animate-float {
+        animation: float 6s ease-in-out infinite;
+    }
+
+    .animate-float-slow {
+        animation: float-slow 8s ease-in-out infinite;
+    }
+
+    .animate-float-slower {
+        animation: float-slower 10s ease-in-out infinite;
+    }
+
+    .animate-breathe {
+        animation: breathe 4s ease-in-out infinite;
+    }
+
+    .animate-float-delayed-1 {
+        animation: float 7s ease-in-out 1s infinite;
+    }
+
+    .animate-float-delayed-2 {
+        animation: float-slow 9s ease-in-out 2s infinite;
+    }
+
+    /* --- Heart Burst Animations --- */
+
+    /* Container for the button */
+    .like-button-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* Ensure no overflow clipping for sparkles */
+        overflow: visible;
+    }
+
+    /* Heart Pop Animation */
+    .heart-icon.liked {
+        animation: heart-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes heart-pop {
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.35);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    /* Sparkles Container */
+    .sparkles-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        height: 100%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        z-index: 1;
+        /* behind heart, but above button bg */
+    }
+
+    .heart-icon {
+        position: relative;
+        z-index: 2;
+    }
+
+    /* Individual Sparkle */
+    .sparkle-burst {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        opacity: 0;
+        /* Initial state before animation */
+        transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0) scale(0);
+    }
+
+    .sparkle-burst.active {
+        animation: burst-out 0.8s ease-out forwards;
+    }
+
+    @keyframes burst-out {
+        0% {
+            opacity: 1;
+            transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0) scale(0);
+        }
+
+        40% {
+            opacity: 1;
+            transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-20px) scale(1.2);
+        }
+
+        100% {
+            opacity: 0;
+            transform: translate(-50%, -50%) rotate(var(--angle)) translateY(-35px) scale(0);
+        }
+    }
+
+    /* Sparkle Colors */
+    .sparkle-burst:nth-child(4n+1) {
+        background-color: #fbbf24;
+        box-shadow: 0 0 4px #fbbf24;
+    }
+
+    /* Gold */
+    .sparkle-burst:nth-child(4n+2) {
+        background-color: #f472b6;
+        box-shadow: 0 0 4px #f472b6;
+    }
+
+    /* Pink */
+    .sparkle-burst:nth-child(4n+3) {
+        background-color: #ffffff;
+        box-shadow: 0 0 4px #ffffff;
+    }
+
+    /* White */
+    .sparkle-burst:nth-child(4n+4) {
+        background-color: #f87171;
+        box-shadow: 0 0 4px #f87171;
+    }
+
+    /* Red */
+
+    /* Optional: Add a glow behind the heart when active */
+    .like-button-container::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+        transform: translate(-50%, -50%) scale(0);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: -1;
+    }
+}

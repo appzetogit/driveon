@@ -1,0 +1,652 @@
+📘 CAR RENTAL APP – FULL PROJECT DOCUMENTATION (MERN)
+CyaP5QpaK20126rB,CyaP5QpaK20126rB
+Version: 1.0
+Type: Developer Documentation
+Purpose: End-to-end reference to build the MERN full-stack Car Rental Application with KYC, Guarantor, Tracking, Filters, Dynamic Pricing, and Referrals.
+
+1. 🌟 PROJECT OVERVIEW
+
+A Car Rental App where users can browse, filter, and book cars.
+To make a booking, users must:
+
+Complete 100% Profile + KYC via DigiLocker
+
+Add a Guarantor who must also complete KYC
+
+Choose a pricing option: Full Payment or 35% Advance Payment
+
+Allow Live Tracking during the trip
+
+Add Reviews & Ratings after completion
+
+Use Referral System for earning points
+
+The pricing should dynamically change based on date + time selection.
+
+2. 🧱 CORE APP FEATURES
+2.1 User & Authentication
+
+Email + Phone Number Registration
+
+OTP Verification
+
+JWT-based Authentication
+
+Roles: User, Guarantor, Admin, Car Owner
+
+2.2 Profile Completion (100% required for booking)
+
+Mandatory fields:
+
+Name
+
+Email
+
+Phone Number
+
+Age
+
+Gender
+
+Address
+
+Profile Photo
+
+Aadhaar (via DigiLocker)
+
+PAN (via DigiLocker)
+
+Driving License (via DigiLocker)
+
+2.3 DigiLocker KYC Integration
+
+OAuth2 Redirect
+
+Fetch Aadhaar, DL, PAN
+
+Store verified document references
+
+2.4 Car Listing
+
+Cars will show:
+
+Model
+
+Brand
+
+Seats
+
+Transmission
+
+Fuel Type: Petrol/Diesel/Electric/Hybrid
+
+Color
+
+Features
+
+Availability Calendar
+
+Rating
+
+Reviews
+
+Owner Details
+
+Price (Dynamic)
+
+2.5 Advanced Filter System
+
+Users can filter cars by:
+
+Brand
+
+Model
+
+Seats
+
+Fuel Type
+
+Transmission
+
+Color
+
+Price Range
+
+Rating
+
+Location
+
+Availability by Date + Time
+
+Features
+
+Car Type (SUV, Sedan, Hatchback, etc.)
+
+2.6 Dynamic Pricing Engine
+
+Price changes based on:
+
+Date of booking (weekday/weekend)
+
+Time of booking (peak hours)
+
+Duration
+
+Seasonal surge
+
+Car demand
+
+Last available units
+
+Festive days (dynamic calendar)
+
+2.7 Guarantor System
+
+User enters guarantor's phone/email
+
+Guarantor receives invite
+
+Guarantor installs app
+
+Completes registration + KYC
+
+User ↔ Guarantor linked in DB
+
+Booking not allowed until Guarantor is verified
+
+2.8 Booking Flow
+
+Steps:
+
+Select Car
+
+Select Date & Time
+
+Dynamic Price Calculation
+
+Payment Option
+
+Full Payment
+
+35% Advance Payment
+
+Add Guarantor
+
+Start Trip → Enable Location
+
+Trip End → Disable Location
+
+Ratings & Reviews
+
+2.9 Payments
+
+Integrate Razorpay / Stripe
+
+Full payment
+
+Partial payment (35%)
+
+Security deposit
+
+Auto debit of remaining amount
+
+2.10 Live Tracking
+
+Mobile App (React Native)
+
+Background Geolocation
+
+Every 10 sec location sent to backend
+
+Live map for admin and car owner
+
+2.11 Ratings & Reviews
+
+User rates car
+
+User rates trip experience
+
+Car owner ratings
+
+2.12 Referral System
+
+Every user gets referral code
+
+If new user signs up → referrer gets points
+
+When new user completes 1 trip → extra reward
+
+Points visible in profile
+
+Points usable as discounts
+
+2.13 Admin Dashboard
+
+Admin can:
+
+Manage Users
+
+Manage Guarantors
+
+Manage Car Listings
+
+Approve/Reject KYC
+
+Handle Disputes
+
+Review Live Tracking
+
+Review Payments
+
+Add Coupons
+
+Dynamic pricing rules
+
+Generate reporting
+
+3. ⚙️ TECH STACK
+Frontend:
+
+React + Vite
+
+TailwindCSS
+
+Redux Toolkit or Zustand
+
+React Query (server state)
+
+Map Integration: Leaflet / Mapbox
+
+Mobile App:
+
+React Native
+
+Background Geolocation Plugin
+
+Socket.io Client
+
+Backend:
+
+Node.js
+
+Express.js / NestJS
+
+JWT Auth
+
+Socket.io for realtime tracking
+
+Node-cron (scheduled jobs for pricing rules, reminders)
+
+Database:
+
+MongoDB + Mongoose
+
+Redis (sessions + caching)
+
+Storage:
+
+AWS S3 / Cloudinary (car images, profile photos)
+
+Integration:
+
+Razorpay / Stripe
+
+DigiLocker OAuth2
+
+Firebase Push Notifications
+
+4. 📂 DATABASE DESIGN (SCHEMAS)
+4.1 User Schema
+
+Includes:
+
+Basic Details
+
+KYC Details
+
+Guarantor Relationship
+
+Referral Details
+
+Wallet / Points
+
+Activity logs
+
+4.2 Car Schema
+
+Includes:
+
+Car Specs
+
+Pricing Rules
+
+Availability Calendar
+
+Average Rating
+
+4.3 Booking Schema
+
+Includes:
+
+Car
+
+User
+
+Guarantor
+
+Costs (dynamic)
+
+Payment Details
+
+Trip Status
+
+Live Tracking Status
+
+4.4 Dynamic Pricing Schema
+
+Admin can set:
+
+Weekend multiplier
+
+Seasonal surcharge
+
+Time-based surge
+
+Special discounts
+
+4.5 Tracking Schema
+
+bookingId
+
+lat
+
+lng
+
+speed
+
+timestamp
+
+I can generate the full code for these if you want.
+
+5. 🔄 FULL SYSTEM FLOW — STEP BY STEP
+5.1 User Journey Flow
+Step 1 — Registration
+
+User enters email + phone
+
+OTP Verification
+
+User profile created with minimal data
+
+Step 2 — Browsing Cars
+
+User sees car listings
+
+Filter system applied
+
+Selecting car takes user to details page
+
+Step 3 — Profile Completion Check
+
+If user tries to book:
+
+Check if profileComplete === true
+If not → redirect to Profile Completion Wizard
+
+Step 4 — DigiLocker Verification
+
+User clicks “Verify Documents”
+
+Redirect to DigiLocker
+
+User approves access
+
+Backend fetches verified docs
+
+Mark KYC = verified
+
+Step 5 — Add Guarantor
+
+User enters guarantor mobile/email
+
+Guarantor receives link
+
+Guarantor registers + KYC
+
+Guarantor linked to user
+
+Step 6 — Date & Time Selection
+
+User selects pickup & drop date & time
+
+Backend pricing engine calculates price
+
+Show final dynamic price
+
+Step 7 — Payment
+
+User chooses Full Pay or 35% Pay
+
+Razorpay payment triggered
+
+Store transaction
+
+Step 8 — Start Trip
+
+GPS Tracking ON
+
+Mobile app runs background service
+
+Tracking data saved every 10 sec
+
+Step 9 — End Trip
+
+User/Owner marks trip complete
+
+Live tracking OFF
+
+Review modal shown
+
+Rating submitted
+
+6. 📊 DYNAMIC PRICING ENGINE LOGIC
+Base Pricing Rules:
+
+basePrice (set by car owner)
+
+Weekend multiplier
+
+Holiday multiplier
+
+Time of day multiplier
+
+Peak demand surcharge
+
+Distance/Duration based
+
+Final Formula:
+totalPrice = basePrice
+            + (weekendMultiplier * basePrice)
+            + (holidayMultiplier * basePrice)
+            + (timeOfDayMultiplier * basePrice)
+            + (demandSurge * basePrice)
+            + durationPrice;
+
+
+Admin can edit pricing rules in dashboard.
+
+7. 🔍 FILTER SYSTEM LOGIC
+
+Backend Filters:
+
+GET /cars?brand=Toyota&seats=5&fuel=Diesel&minPrice=500&maxPrice=2000&rating=4&availableFrom=...&availableTo=...
+
+
+Filters include:
+
+Brand
+
+Model
+
+Seats
+
+Fuel Type
+
+Transmission
+
+Color
+
+Price Range
+
+Rating
+
+Features Array
+
+Location
+
+Availability (date & time)
+
+All filters combine with AND logic.
+
+8. 📡 LIVE LOCATION TRACKING SYSTEM
+At Trip Start:
+
+Backend sets tracking: enabled
+
+Mobile app starts background GPS
+
+Mobile → Backend:
+POST /tracking/update
+body: { bookingId, lat, lng, speed }
+
+Realtime (Socket.io):
+
+Admin panel and car owner get live updates
+
+At Trip End:
+
+Tracking disabled
+
+Logs stored for 6 months
+
+9. 🧩 REFERRAL SYSTEM
+Referral Flow:
+
+Each user gets a code
+
+New user applies code during signup
+
+If new user completes trip:
+
+Referrer gets points
+
+Points visible in UI
+
+Points usable for discounts
+
+10. 🛠️ STEP-BY-STEP DEVELOPMENT PLAN
+PHASE 1 — ENV SETUP
+
+Create backend (Node + Express)
+
+Create frontend (React + Vite)
+
+Create mobile app (React Native)
+
+Setup MongoDB Atlas
+
+Setup S3 Bucket
+
+PHASE 2 — BACKEND FOUNDATIONS
+
+Auth APIs
+
+User profile APIs
+
+Car CRUD APIs
+
+Filter logic
+
+Dynamic pricing engine
+
+Booking API (without payment)
+
+PHASE 3 — KYC & GUARANTOR
+
+DigiLocker OAuth2 integration
+
+KYC verification storage
+
+Guarantor linking APIs
+
+PHASE 4 — PAYMENTS
+
+Razorpay integration
+
+Full payment
+
+35% partial payment flow
+
+Payment Webhooks
+
+PHASE 5 — MOBILE APP (TRACKING)
+
+GPS permissions
+
+Background tracking
+
+Send to backend
+
+Live Map in admin panel
+
+PHASE 6 — REVIEWS + REFERRALS
+
+Review APIs
+
+Referral system
+
+Points redemption
+
+PHASE 7 — ADMIN DASHBOARD
+
+Manage Cars
+
+Manage Users
+
+Manage KYC
+
+Manage Bookings
+
+Pricing rules
+
+Reports
+
+PHASE 8 — TESTING & DEPLOYMENT
+
+API Testing
+
+UI Testing
+
+Performance Testing
+
+Deploy Backend
+
+Deploy Frontend
+
+Publish mobile app
+
+11. 🚀 FINAL OUTPUT OF THIS DOCUMENT
+
+You now have:
+
+Complete system flow
+
+Feature specifications
+
+Database structure
+
+Filter logic
+
+Dynamic pricing logic
+
+Step-by-step build plan

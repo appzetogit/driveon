@@ -1,0 +1,231 @@
+🚀 EMPLOYEE APP — FINAL & COMPLETE FRONTEND FLOW (WITH ADD-ONS MERGED)
+
+Purpose:
+Employee apna daily ka kaam, targets, enquiries, follow-ups, tasks, attendance, salary & performance track kare — CRM ke sath fully connected.
+
+Theme:
+Current CRM blue + clean white UI
+Layout:
+Mobile-first (responsive for web)
+Animations:
+micro-scale, shimmer loading, pull-to-refresh
+
+🧭 GLOBAL NAVIGATION
+🔻 Bottom Navigation (primary)
+Home     Enquiries     Tasks     Attendance     Profile
+
+☰ Side Drawer Navigation (swipe)
+• Today’s Agenda
+• My Enquiries
+• Missed Enquiries
+• Today’s Follow-ups
+• My Tasks
+• Performance Targets ⭐ (ADD-ON)
+• Leaderboard ⭐ (ADD-ON)
+• Expense Claims ⭐ (ADD-ON)
+• Salary Ledger
+• Staff Directory
+• Company Notices
+• Suggestion Box ⭐ (ADD-ON)
+• Notifications
+• Settings
+
+🏠 1️⃣ HOME PAGE (TODAY WORK CENTER — WITH TARGETS & TEAM STATUS)
+👤 Header
+Hello Payal 👋 | Sales Executive | Shift: 10 AM - 7 PM
+
+⏱ Attendance & Timing
+Clock-in / Clock-out Button (primary)
+Today Hours: 6h 42m (auto timer)
+Attendance Status: Present | Late | Leave | Pending
+
+🎯 Performance Targets (ADD-ON ✓)
+Calls: 12 / 20     ▓▓▓▓▓░░░░░░
+Follow-ups: 5 / 8 ▓▓▓▓▓▓░░░
+Conversions: 0 / 2 ▓░░░░░░░░
+Target Score: 68% 🔥
+
+📈 KPI Widgets
+• New Enquiries today: 4
+• Today’s Follow-ups: 3
+• Missed Follow-ups: 1 🔔
+• Tasks Due Today: 5
+• Pending Expense Claims: 2
+• Team Present Today: 12/18
+
+💬 Today’s Follow-ups List
+• Rohan — Innova — 5 PM — (Call / WhatsApp)
+
+📋 Today’s Tasks List
+[HIGH] Call vendor about Swift repair
+[MED] Collect KYC docs from Amit
+
+💬 Company Notices
+• Tomorrow briefing @ 10AM
+• New Tariff Rates Updated
+
+👥 Team Presence Preview (Merged Feature)
+🟢 Present: 12 | 🔴 Absent: 4 | 🟡 Leave: 2
+Tap → Staff Directory
+
+➕ Quick FAB Actions
++ Add Enquiry
++ Add Task
++ Add Follow-up
++ Add Expense Claim ⭐
+
+📞 2️⃣ ENQUIRIES FLOW (WITH PRIORITY SYSTEM)
+Tabs:
+All | New | In Progress | Converted | Closed | Missed | 🔥 Priority
+
+Priority Labels (ADD-ON ✓)
+HOT (🔴) = convert today
+WARM (🟠) = possibility high
+COLD (⚪) = low priority
+
+Enquiry Card
+Rohan Sharma  —  Innova Crysta
+Budget: ₹2000/day   HOT 🔴
+Last Contact: Today 11:30 AM
+Follow-up: Today 5 PM   [Call] [WA] [Note]
+
+Enquiry Detail
+Customer Info
+Car Requirement
+Notes & Voice Notes (optional future)
+Follow-up timeline
+Add reminder
+Mark status: New → In Prog → Converted / Lost
+Convert to Booking (frontend only)
+
+📝 3️⃣ TASKS FLOW (BLOCKED REASON + PRIORITY)
+Tabs: All | Pending | Completed | Overdue | Blocked ⭐
+
+Task Card
+[⭕ HIGH] Call vendor — Due 4 PM
+Linked enquiry: Rohan
+[Mark Done] [Add Note] [Block Task]
+
+Block Reason (ADD-ON LOGICAL SUPPORT)
+• Customer not reachable
+• Awaiting payment
+• Awaiting documents
+• Other
+
+🕒 4️⃣ ATTENDANCE FLOW
+Clock-in / out
+Timer running bar
+Monthly calendar:
+🟢 Present | 🔴 Absent | 🟡 Late | 🔵 Leave
+Punctuality score & streak
+
+💸 5️⃣ SALARY VIEW
+Current Month Salary:
+Gross: 25,000 | Deductions: 5,000 | Net: 20,000
+Advances history
+Download salary slip (placeholder)
+
+🧾 6️⃣ EXPENSE CLAIMS (ADD-ON ✓)
+Expense Claims
+ ├─ Add Claim (photo upload)
+ └─ History: pending / approved / rejected
+
+🏆 7️⃣ LEADERBOARD (ADD-ON ✓)
+Weekly Ranking
+1. Payal — 89 pts
+2. Mohit — 82 pts
+3. Shreya — 76 pts
+
+Score breakdown:
+• Calls completed
+• Follow-ups done
+• Tasks on time
+• Attendance streak
+
+
+Motivation + competition == higher daily activity 🚀
+
+🎯 8️⃣ PERSONAL TARGETS PAGE (ADD-ON ✓)
+Monthly Target Breakdown
+Daily streaks
+Reward Badges:
+⭐ Hustler — 30 follow-ups in week
+⭐ Closer — 5 conversions in month
+
+💡 9️⃣ SUGGESTION BOX (ADD-ON ✓)
+Submit suggestion
+My suggestions (status: seen / accepted / pending)
+
+👥 🔟 STAFF DIRECTORY — WITH PRESENCE
+Payal — 🟢 Present (Today 9:58 AM)
+Shreya — 🔴 Absent
+Tap → contact or view profile
+
+🔔 1️⃣1 NOTIFICATIONS
+• New enquiry assigned
+• Reminder due now
+• Salary processed
+• Expense claim approved
+
+
+Tap notification → deep link to page
+
+📌 END-TO-END WORKFLOW (FULL SYSTEM)
+Login
+↓
+Clock-in
+↓
+Check Today Targets
+↓
+Work on follow-ups, enquiries, tasks
+↓
+Update statuses, add reminders
+↓
+Add expense claim (fuel / parking / food)
+↓
+Check leaderboard to stay motivated
+↓
+Clock-out
+↓
+Salary auto computed from attendance
+↓
+Performance reviewed via targets & streaks
+
+🔥 FEATURE IMPACT MAPPING
+Feature	Benefit
+Targets	daily discipline
+Priority enquiries	conversion ↑
+Expense claims	transparency
+Leaderboard	motivation
+Suggestion box	employee voice
+Team presence	visibility
+Attendance streaks	punctuality
+🧩 SCREEN COUNT (FINAL)
+Module	Screens
+Home	1
+Enquiries	6
+Tasks	4
+Attendance	2
+Salary	2
+Expense Claims	2
+Targets	2
+Leaderboard	2
+Staff Directory	1
+Suggestions	2
+Notices	1
+Notifications	1
+Profile + Settings	2
+
+➡ TOTAL: ~28 screens (MVP+)
+
+🎨 UI DIRECTIVES (for Anti-Gravity)
+• neumorphism-light shadows
+• pull-to-refresh lists
+• state animations: bounce-in list items
+• circular progress for targets
+• badge glow for HOT enquiries
+• leaderboard avatar glow for top 3
+
+📌 1-LINE DELIVERY DESCRIPTION
+
+Employee App = CRM ka execution engine — jahan se daily work, targets, performance & salary ek hi flow me track hote hain.
