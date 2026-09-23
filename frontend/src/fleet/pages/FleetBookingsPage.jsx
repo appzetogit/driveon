@@ -340,6 +340,78 @@ const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
                 </div>
               </Card>
 
+              {/* Security & Exchange Collateral Card */}
+              {(Number(booking.deposit || 0) > 0 || booking.depositItem?.itemName) && (
+                <Card className="p-0 overflow-hidden border" style={{ borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+                  <div className="p-6 border-b flex flex-wrap items-center justify-between gap-3" style={{ borderBottomColor: colors.borderMedium, backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🛡️</span>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-blue-500">
+                        Security Deposit & Exchange Collateral
+                      </h3>
+                    </div>
+                    {booking.depositItem?.itemName && (
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full border ${booking.depositItem.returnStatus === 'returned' ? 'bg-green-500/10 text-green-600 border-green-500/20' : 'bg-amber-500/10 text-amber-600 border-amber-500/20'}`}>
+                        {booking.depositItem.returnStatus === 'returned' ? '✓ Item Returned to Customer' : '⏳ Item Deposited with Admin'}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="p-6 space-y-6">
+                    {/* Monetary Deposit if any */}
+                    {Number(booking.deposit || 0) > 0 && (
+                      <div className="flex items-center justify-between p-4 rounded-xl border" style={{ borderColor: 'rgba(168, 85, 247, 0.2)', backgroundColor: 'rgba(168, 85, 247, 0.05)' }}>
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">💵</span>
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-purple-600">Cash Security Deposit</p>
+                            <p className="text-xs text-gray-500">Refundable upon vehicle return without damages</p>
+                          </div>
+                        </div>
+                        <span className="text-xl font-black text-purple-600">{formatCurrency(booking.deposit)}</span>
+                      </div>
+                    )}
+
+                    {/* Physical Collateral Item if any */}
+                    {booking.depositItem?.itemName && (
+                      <div className="p-4 rounded-xl border" style={{ borderColor: colors.borderMedium, backgroundColor: colors.backgroundSecondary }}>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div className="space-y-3 flex-1">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                              <InfoItem label="Vehicle Category" value={booking.depositItem.itemType || 'Bike / Motorcycle'} />
+                              <InfoItem label="Bike / Scooter Model" value={booking.depositItem.itemName} valueClass="font-bold text-blue-600" />
+                              <InfoItem label="Custody Status" value={booking.depositItem.returnStatus === 'returned' ? 'Returned to Customer' : 'Held by Admin'} valueClass={booking.depositItem.returnStatus === 'returned' ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'} />
+                            </div>
+
+                            {booking.depositItem.returnedAt && (
+                              <div className="pt-2 border-t" style={{ borderTopColor: colors.borderLight }}>
+                                <InfoItem label="Returned On" value={formatDateTime(booking.depositItem.returnedAt)} valueClass="text-green-600 font-semibold" />
+                              </div>
+                            )}
+                          </div>
+
+                          {booking.depositItem.itemImage && (
+                            <div className="flex-shrink-0">
+                              <a href={booking.depositItem.itemImage} target="_blank" rel="noreferrer" className="relative group block">
+                                <img
+                                  src={booking.depositItem.itemImage}
+                                  alt={booking.depositItem.itemName}
+                                  className="w-24 h-24 object-cover rounded-lg border shadow-sm transition-transform group-hover:scale-105"
+                                  style={{ borderColor: colors.borderMedium }}
+                                />
+                                <span className="absolute inset-0 bg-black/50 text-white text-[10px] opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg transition-opacity font-semibold">
+                                  View
+                                </span>
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
             </div>
           </div>
 
@@ -539,10 +611,28 @@ const FleetBookingsPage = () => {
                       <span style={{ color: colors.textSecondary }}>Paid Amount:</span>
                       <span className="font-semibold text-green-400">{formatCurrency(paidAmount)}</span>
                     </div>
-                    {b.deposit > 0 && (
+                    {Number(b.deposit || 0) > 0 && (
                       <div className="flex justify-between text-sm">
                         <span style={{ color: colors.textSecondary }}>Security Deposit:</span>
                         <span className="font-bold text-purple-400">{formatCurrency(b.deposit)}</span>
+                      </div>
+                    )}
+                    {b.depositItem?.itemName && (
+                      <div className="flex flex-col gap-1 py-1.5 px-2 rounded-lg border text-xs" style={{ borderColor: 'rgba(59, 130, 246, 0.3)', backgroundColor: 'rgba(59, 130, 246, 0.08)' }}>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-semibold text-blue-400 flex items-center gap-1 truncate">
+                            <span>🛵</span>
+                            <span className="truncate">{b.depositItem.itemName}</span>
+                          </span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${b.depositItem.returnStatus === 'returned' ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                            {b.depositItem.returnStatus === 'returned' ? 'Returned' : 'Deposited'}
+                          </span>
+                        </div>
+                        {b.depositItem.itemNumber && (
+                          <span className="font-mono text-[10px] text-gray-400 uppercase">
+                            {b.depositItem.itemNumber}
+                          </span>
+                        )}
                       </div>
                     )}
                     <div className="flex justify-between text-sm border-t pt-1.5" style={{ borderTopColor: colors.borderLight }}>

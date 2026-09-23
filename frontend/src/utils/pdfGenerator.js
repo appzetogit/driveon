@@ -356,12 +356,12 @@ export const generateBookingPDF = (bookingData) => {
   const offerCode = bookingData.pricing?.offerCode || bookingData.offerCode;
 
   const hasDiscounts = couponDiscount > 0 || offerDiscount > 0 || pointsDiscount > 0;
-  
+
   if (hasDiscounts) {
     yPosition = pricingBoxY + pricingBoxHeight + 5;
     const discountLines = (couponDiscount > 0 ? 1 : 0) + (offerDiscount > 0 ? 1 : 0) + (pointsDiscount > 0 ? 1 : 0);
     const discountBoxHeight = 10 + (discountLines * 5.5);
-    
+
     doc.setFillColor(...lightGray);
     doc.roundedRect(margin, yPosition - 5, contentWidth, discountBoxHeight, 2, 2, 'F');
 
@@ -433,8 +433,7 @@ export const generateBookingPDF = (bookingData) => {
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139); // slate-500
-  doc.text('Anjaneya Techno Park, First Floor, No. 147, HAL Old Airport Road,', pageWidth / 2, footerY + 4, { align: 'center' });
-  doc.text('ISRO Colony, Kodihalli, Bangalore, Karnataka 560008', pageWidth / 2, footerY + 7.5, { align: 'center' });
+
 
   // Safety/Mandatory Warning
   doc.setFontSize(7.5);
@@ -454,12 +453,12 @@ export const generateBookingPDF = (bookingData) => {
 export const generateAllBookingsPDF = (bookings, stats) => {
   const doc = new jsPDF('l', 'mm', 'a4'); // Landscape for tabular data
   const pageWidth = doc.internal.pageSize.getWidth();
-  
+
   // Header
   doc.setFontSize(20);
   doc.setTextColor(28, 32, 92);
   doc.text('DriveOn - Bookings Report', pageWidth / 2, 20, { align: 'center' });
-  
+
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139);
   doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, pageWidth / 2, 28, { align: 'center' });

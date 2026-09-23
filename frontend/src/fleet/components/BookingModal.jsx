@@ -43,7 +43,15 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
   // Payment fields — simplified
   const [paymentMode, setPaymentMode] = useState('cash'); // 'cash' | 'razorpay'
   const [paymentType, setPaymentType] = useState('advance'); // 'advance' | 'full'
+  // Security deposit & collateral exchange states
+  const [depositType, setDepositType] = useState('money'); // 'none' | 'money' | 'item' | 'both'
   const [deposit, setDeposit] = useState('');
+  const [depositItemType, setDepositItemType] = useState('Bike / Motorcycle');
+  const [depositItemName, setDepositItemName] = useState('');
+  const [depositItemNumber, setDepositItemNumber] = useState('');
+  const [depositItemDetails, setDepositItemDetails] = useState('');
+  const [depositItemImage, setDepositItemImage] = useState(null);
+  const [depositItemImagePreview, setDepositItemImagePreview] = useState('');
   const [cashCollectors, setCashCollectors] = useState([]);
   const [cashCollector, setCashCollector] = useState('');
   const [advancePercentage, setAdvancePercentage] = useState(20); // Dynamic from settings
@@ -117,6 +125,7 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL('image/jpeg');
     if (activeCameraField === 'customer') { setCustomerImagePreview(dataUrl); setCustomerImage(dataUrl); }
+    else if (activeCameraField === 'depositItem') { setDepositItemImagePreview(dataUrl); setDepositItemImage(dataUrl); }
     stopCamera();
   };
 
@@ -127,6 +136,15 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
       const url = await fileToDataUrl(file);
       setCustomerImage(file); setCustomerImagePreview(String(url || ''));
     } catch (e) { setCustomerImage(null); setCustomerImagePreview(''); setError(e?.message || 'Failed to load image'); }
+  };
+
+  const onPickDepositItemImage = async (file) => {
+    setError('');
+    if (!file) { setDepositItemImage(null); setDepositItemImagePreview(''); return; }
+    try {
+      const url = await fileToDataUrl(file);
+      setDepositItemImage(file); setDepositItemImagePreview(String(url || ''));
+    } catch (e) { setDepositItemImage(null); setDepositItemImagePreview(''); setError(e?.message || 'Failed to load item image'); }
   };
 
   // PAN image upload removed
@@ -254,7 +272,14 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     setActiveCameraField(null);
     setPanNumber('');
     setIsPanVerified(false);
+    setDepositType('money');
     setDeposit('');
+    setDepositItemType('Bike / Motorcycle');
+    setDepositItemName('');
+    setDepositItemNumber('');
+    setDepositItemDetails('');
+    setDepositItemImage(null);
+    setDepositItemImagePreview('');
     setCashCollector('');
     setAdvancePercentage(settingsPercentageRef.current); // Reset to system setting value
   }, [open, car?.id]);
@@ -307,6 +332,7 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     if (!isValidDateRange(fromDate, toDate)) return false;
     if (hasOverlap) return false;
     if (paymentMode === 'cash' && !cashCollector) return false;
+    if (car.type === 'inward' && (depositType === 'item' || depositType === 'both') && !depositItemName.trim()) return false;
     return true;
   }, [car, customerName, customerPhone, customerImagePreview, fromDate, toDate, startTime, endTime, isDlVerified, isPanVerified, panNumber, hasOverlap, paymentMode, cashCollector]);
 
@@ -333,6 +359,10 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     // Aadhaar is optional — no verification required
     if (hasOverlap) { setError('Car is already booked for these dates'); return; }
     if (paymentMode === 'cash' && !cashCollector) { setError('Please select who collected the cash'); return; }
+    if (car.type === 'inward' && (depositType === 'item' || depositType === 'both') && !depositItemName.trim()) {
+      setError('Please enter the deposited item / bike model name');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -362,7 +392,16 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
         aadhaarVerified: isAadhaarVerified,
         licenseNumber: licenseNumber.trim(),
         licenseVerified: isDlVerified,
-        deposit: car.type === 'inward' ? (Number(deposit) || 0) : 0,
+        depositType: car.type === 'inward' ? depositType : 'none',
+        deposit: car.type === 'inward' && (depositType === 'money' || depositType === 'both') ? (Number(deposit) || 0) : 0,
+        depositItem: car.type === 'inward' && (depositType === 'item' || depositType === 'both') ? {
+          itemType: depositItemType || 'Bike / Motorcycle',
+          itemName: depositItemName.trim(),
+          itemNumber: '',
+          itemDetails: '',
+          itemImage: '',
+          returnStatus: 'deposited',
+        } : null,
         cashCollector: paymentMode === 'cash' ? cashCollector : '',
       };
 
@@ -772,22 +811,113 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
             )}
           </div>
 
-          {/* ── Security Deposit (Inward Only) ── */}
+          {/* ── Security Deposit & Exchange Collateral (Inward Only) ── */}
           {car.type === 'inward' && (
-            <div className="border rounded-xl p-4" style={{ borderColor: colors.borderMedium, backgroundColor: colors.backgroundPrimary }}>
-              <label className="block text-sm font-bold uppercase tracking-wide mb-2" style={labelStyle}>
-                Security Deposit (Record Only)
-              </label>
-              <input
-                type="number"
-                value={deposit}
-                onChange={(e) => setDeposit(e.target.value)}
-                className="w-full rounded-lg border px-3 py-2 outline-none text-sm font-semibold"
-                style={inputStyle}
-                placeholder="Enter deposit amount in ₹ (e.g. 5000)"
-                min={0}
-              />
-              <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>This is for record-keeping to track the security deposit kept with the admin.</p>
+            <div className="border rounded-xl p-4 space-y-4" style={{ borderColor: colors.borderMedium, backgroundColor: colors.backgroundPrimary }}>
+              <div>
+                <label className="block text-sm font-bold uppercase tracking-wide" style={labelStyle}>
+                  Security Deposit & Exchange Collateral
+                </label>
+                <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>
+                  Choose monetary security deposit, physical vehicle exchange (e.g. Bike / Scooty), or both to hold until car return.
+                </p>
+              </div>
+
+              {/* Deposit Mode Selector */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { value: 'money', label: 'Cash / Money', icon: '💵', desc: 'Amount in ₹' },
+                  { value: 'item', label: 'Bike / Scooter', icon: '🏍️', desc: 'Deposit Vehicle' },
+                  { value: 'both', label: 'Both (Money + Bike)', icon: '🔄', desc: 'Cash + Bike' },
+                  { value: 'none', label: 'No Deposit', icon: '🚫', desc: 'Skip deposit' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setDepositType(opt.value)}
+                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border-2 transition-all text-center"
+                    style={{
+                      borderColor: depositType === opt.value ? colors.backgroundTertiary : colors.borderMedium,
+                      backgroundColor: depositType === opt.value ? `${colors.backgroundTertiary}15` : colors.backgroundSecondary,
+                    }}
+                  >
+                    <span className="text-xl mb-1">{opt.icon}</span>
+                    <span className="text-xs font-bold" style={{ color: colors.textPrimary }}>{opt.label}</span>
+                    <span className="text-[10px] mt-0.5" style={{ color: colors.textSecondary }}>{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Money Deposit Input */}
+              {(depositType === 'money' || depositType === 'both') && (
+                <div className="p-3.5 rounded-xl border space-y-1.5 animate-fade-in" style={{ borderColor: colors.borderMedium, backgroundColor: colors.backgroundSecondary }}>
+                  <label className="block text-xs font-bold uppercase tracking-wide" style={labelStyle}>
+                    Security Deposit Amount in ₹ <span style={{ color: colors.accentRed }}>*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={deposit}
+                    onChange={(e) => setDeposit(e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2 outline-none text-sm font-semibold"
+                    style={inputStyle}
+                    placeholder="Enter deposit amount in ₹ (e.g. 5000)"
+                    min={0}
+                  />
+                  <p className="text-xs" style={{ color: colors.textSecondary }}>
+                    Security deposit kept with admin (recorded for accounting and refund upon vehicle return).
+                  </p>
+                </div>
+              )}
+
+              {/* Physical Exchange Item Input */}
+              {(depositType === 'item' || depositType === 'both') && (
+                <div className="p-4 rounded-xl border space-y-3 animate-fade-in" style={{ borderColor: 'rgba(59, 130, 246, 0.4)', backgroundColor: 'rgba(59, 130, 246, 0.04)' }}>
+                  <div className="flex items-center gap-2 pb-2 border-b" style={{ borderColor: colors.borderLight }}>
+                    <span className="text-xl">🛵</span>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-blue-500">
+                        Exchange Deposit (Bike / Scooter Held by Admin)
+                      </h4>
+                      <p className="text-[11px]" style={{ color: colors.textSecondary }}>
+                        User deposits their personal bike or scooter until the rented car is returned.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Vehicle Category & Bike/Scooter Model */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={labelStyle}>
+                        Vehicle Category <span style={{ color: colors.accentRed }}>*</span>
+                      </label>
+                      <select
+                        value={depositItemType}
+                        onChange={(e) => setDepositItemType(e.target.value)}
+                        className="w-full rounded-lg border px-3 py-2 text-sm outline-none font-medium cursor-pointer"
+                        style={inputStyle}
+                      >
+                        <option value="Bike / Motorcycle">🏍️ Bike / Motorcycle</option>
+                        <option value="Scooter">🛵 Scooter / Scooty</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={labelStyle}>
+                        Bike / Scooter Name & Model <span style={{ color: colors.accentRed }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={depositItemName}
+                        onChange={(e) => setDepositItemName(e.target.value)}
+                        className="w-full rounded-lg border px-3 py-2 text-sm outline-none font-medium"
+                        style={inputStyle}
+                        placeholder="e.g. Hero Splendor Plus / Honda Activa 6G"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -389,6 +389,8 @@ export const getOutwardBookings = async (req, res) => {
             panNumber: b.panNumber || '',
             panVerified: b.panVerified || false,
             deposit: b.deposit || 0,
+            depositType: b.depositType || (b.deposit > 0 ? 'money' : (b.depositItem?.itemName ? 'item' : 'none')),
+            depositItem: b.depositItem || null,
             cashCollector: b.cashCollector || '',
             advanceCashCollector: b.advanceCashCollector || '',
             remainingCashCollector: b.remainingCashCollector || '',
@@ -440,6 +442,20 @@ export const createOutwardBooking = async (req, res) => {
         const licenseImageSecure = await uploadToCloudinaryIfBase64(bookingData.licenseImage, 'licenses');
         const aadhaarImageSecure = await uploadToCloudinaryIfBase64(bookingData.aadhaarImage, 'aadhaars');
 
+        let depositItemData = null;
+        if (bookingData.depositItem && typeof bookingData.depositItem === 'object') {
+            const itemImageSecure = await uploadToCloudinaryIfBase64(bookingData.depositItem.itemImage, 'deposit-items');
+            depositItemData = {
+                itemType: bookingData.depositItem.itemType || 'Bike / Two-Wheeler',
+                itemName: bookingData.depositItem.itemName || '',
+                itemNumber: bookingData.depositItem.itemNumber || '',
+                itemDetails: bookingData.depositItem.itemDetails || '',
+                itemImage: itemImageSecure || '',
+                returnStatus: bookingData.depositItem.returnStatus || 'deposited',
+                returnedAt: bookingData.depositItem.returnedAt || null,
+            };
+        }
+
         const newBooking = await OutwardBooking.create({
             originalBookingId: bookingData.id,
             carId: bookingData.carId,
@@ -471,6 +487,8 @@ export const createOutwardBooking = async (req, res) => {
             panNumber: bookingData.panNumber || '',
             panVerified: bookingData.panVerified || false,
             deposit: bookingData.deposit || 0,
+            depositType: bookingData.depositType || (bookingData.deposit > 0 ? 'money' : (depositItemData?.itemName ? 'item' : 'none')),
+            depositItem: depositItemData,
             cashCollector: bookingData.cashCollector || '',
             advanceCashCollector: bookingData.cashCollector || '',
             status: bookingData.status || 'active'
@@ -522,6 +540,8 @@ export const createOutwardBooking = async (req, res) => {
             panNumber: newBooking.panNumber,
             panVerified: newBooking.panVerified,
             deposit: newBooking.deposit || 0,
+            depositType: newBooking.depositType || 'none',
+            depositItem: newBooking.depositItem || null,
             cashCollector: newBooking.cashCollector || '',
             advanceCashCollector: newBooking.advanceCashCollector || '',
             remainingCashCollector: newBooking.remainingCashCollector || '',
@@ -819,12 +839,14 @@ export const cancelOutwardBooking = async (req, res) => {
         let updatedData = null;
 
         // 1. Cancel OutwardBooking if it exists in OutwardBooking collection
-        const outwardBooking = await OutwardBooking.findOneAndUpdate(
-            { originalBookingId: id },
-            { status: 'cancelled' },
-            { new: true }
-        );
+        const outwardBooking = await OutwardBooking.findOne({ originalBookingId: id });
         if (outwardBooking) {
+            outwardBooking.status = 'cancelled';
+            if (outwardBooking.depositItem && outwardBooking.depositItem.returnStatus === 'deposited') {
+                outwardBooking.depositItem.returnStatus = 'returned';
+                outwardBooking.depositItem.returnedAt = new Date();
+            }
+            await outwardBooking.save();
             success = true;
             updatedData = outwardBooking;
         }
@@ -914,7 +936,7 @@ export const cancelOutwardBooking = async (req, res) => {
 export const completeOutwardBooking = async (req, res) => {
     try {
         const { id } = req.params;
-        const { paidAmount, paymentMode, paymentStatus, transactionId, cashCollector } = req.body;
+        const { paidAmount, paymentMode, paymentStatus, transactionId, cashCollector, returnDepositItem } = req.body;
         const booking = await OutwardBooking.findOne({ originalBookingId: id });
         if (!booking) {
             return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -951,6 +973,12 @@ export const completeOutwardBooking = async (req, res) => {
         if (cashCollector) {
             booking.cashCollector = cashCollector;
             booking.remainingCashCollector = cashCollector;
+        }
+
+        // Return deposited physical item if customer deposited one
+        if (booking.depositItem && (returnDepositItem === true || returnDepositItem === 'true' || booking.depositItem.itemName)) {
+            booking.depositItem.returnStatus = 'returned';
+            booking.depositItem.returnedAt = new Date();
         }
 
         await booking.save();

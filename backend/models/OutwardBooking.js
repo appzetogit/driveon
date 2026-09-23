@@ -112,6 +112,41 @@ const outwardBookingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    depositType: {
+      type: String,
+      enum: ['none', 'money', 'item', 'both'],
+      default: 'none',
+    },
+    depositItem: {
+      itemType: {
+        type: String,
+        default: '',
+      },
+      itemName: {
+        type: String,
+        default: '',
+      },
+      itemNumber: {
+        type: String,
+        default: '',
+      },
+      itemDetails: {
+        type: String,
+        default: '',
+      },
+      itemImage: {
+        type: String,
+        default: '',
+      },
+      returnStatus: {
+        type: String,
+        enum: ['deposited', 'returned'],
+        default: 'deposited',
+      },
+      returnedAt: {
+        type: Date,
+      },
+    },
     cashCollector: {
       type: String,
       default: '',
