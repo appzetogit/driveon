@@ -709,20 +709,44 @@ export const verifyOTP = async (req, res) => {
  */
 export const staffLogin = async (req, res) => {
   try {
-    const { phone, password } = req.body;
+    const { phone, email, identifier, username, password } = req.body;
+    const loginInput = (phone || email || identifier || username || '').trim();
 
-    if (!phone || !password) {
+    if (!loginInput || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide phone number and password',
+        message: 'Please provide phone number or email and password',
       });
     }
 
-    // Check for staff by phone number — strip non-digits, match last 10 digits
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    const staff = await Staff.findOne({
-      phone: { $regex: cleanPhone + '$' }
-    });
+    let staff = null;
+
+    if (loginInput.includes('@')) {
+      // Find staff by email (case-insensitive)
+      const escaped = loginInput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      staff = await Staff.findOne({
+        email: { $regex: new RegExp(`^${escaped}$`, 'i') }
+      });
+    } else {
+      // Check for staff by phone number — strip non-digits, match last 10 digits
+      const cleanPhone = loginInput.replace(/\D/g, '');
+      if (cleanPhone.length >= 7) {
+        staff = await Staff.findOne({
+          phone: { $regex: cleanPhone.slice(-10) + '$' }
+        });
+      }
+
+      // If not found by phone, check by employeeId or email
+      if (!staff) {
+        const escaped = loginInput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        staff = await Staff.findOne({
+          $or: [
+            { employeeId: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+            { email: { $regex: new RegExp(`^${escaped}$`, 'i') } }
+          ]
+        });
+      }
+    }
 
     if (!staff) {
       return res.status(401).json({

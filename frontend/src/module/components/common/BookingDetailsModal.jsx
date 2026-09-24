@@ -279,6 +279,25 @@ const BookingDetailsModal = ({ booking, onClose, onCancel }) => {
               </p>
             </div>
 
+            {/* Starting Meter KM */}
+            {booking.startKm != null && (
+              <div className="p-3 rounded-lg flex items-center justify-between" style={{ backgroundColor: colors.backgroundPrimary }}>
+                <div>
+                  <p className="text-xs mb-0.5" style={{ color: colors.textSecondary }}>
+                    Starting Meter Reading
+                  </p>
+                  <p className="text-sm font-bold text-indigo-700 font-mono">
+                    🚗 {Number(booking.startKm).toLocaleString()} KM
+                  </p>
+                </div>
+                {booking.startKmEnteredAt && (
+                  <span className="text-[10px] text-gray-500">
+                    {new Date(booking.startKmEnteredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Delay Message - Show if trip end date has passed */}
             {(() => {
               const delayInfo = calculateDelay(booking.dropDate, booking.dropTime);

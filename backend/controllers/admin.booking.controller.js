@@ -154,6 +154,7 @@ export const getAllBookings = async (req, res) => {
       .populate('car', 'brand model year registrationNumber fuelType transmission seatingCapacity location')
       .populate('guarantor', 'name phone email')
       .populate('assignedDriver', 'name phone email status employeeId')
+      .populate('startKmEnteredBy', 'name phone email status employeeId')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -242,7 +243,8 @@ export const getBookingById = async (req, res) => {
           .populate('user', 'name phone email age gender address profilePhoto')
           .populate('car', 'brand model year color registrationNumber images pricePerDay owner')
           .populate('guarantor', 'name phone email')
-          .populate('assignedDriver', 'name phone email status employeeId');
+          .populate('assignedDriver', 'name phone email status employeeId')
+          .populate('startKmEnteredBy', 'name phone email status employeeId');
 
         if (booking) {
           console.log('✅ Booking found by _id:', booking.bookingId || booking._id);
@@ -261,7 +263,8 @@ export const getBookingById = async (req, res) => {
           .populate('user', 'name phone email age gender address profilePhoto')
           .populate('car', 'brand model year color registrationNumber images pricePerDay owner')
           .populate('guarantor', 'name phone email')
-          .populate('assignedDriver', 'name phone email status employeeId');
+          .populate('assignedDriver', 'name phone email status employeeId')
+          .populate('startKmEnteredBy', 'name phone email status employeeId');
 
         if (booking) {
           console.log('✅ Booking found by bookingId:', booking.bookingId);

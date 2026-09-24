@@ -3,6 +3,7 @@ import { colors } from '../../module/theme/colors';
 import api from '../../services/api';
 import { Button } from '../../components/common';
 import { commonService } from '../../services/common.service';
+import InwardAgreementModal from './InwardAgreementModal';
 import {
   getDaysBetween,
   getDaysBetweenWithTime,
@@ -74,6 +75,11 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
   // PAN states
   const [panNumber, setPanNumber] = useState('');
   const [isPanVerified, setIsPanVerified] = useState(false);
+
+  // Inward Rental Agreement states
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
+  const [isAgreementDone, setIsAgreementDone] = useState(false);
+  const [agreementDetails, setAgreementDetails] = useState(null);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -333,8 +339,9 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     if (hasOverlap) return false;
     if (paymentMode === 'cash' && !cashCollector) return false;
     if (car.type === 'inward' && (depositType === 'item' || depositType === 'both') && !depositItemName.trim()) return false;
+    if (car.type === 'inward' && !isAgreementDone) return false;
     return true;
-  }, [car, customerName, customerPhone, customerImagePreview, fromDate, toDate, startTime, endTime, isDlVerified, isPanVerified, panNumber, hasOverlap, paymentMode, cashCollector]);
+  }, [car, customerName, customerPhone, customerImagePreview, fromDate, toDate, startTime, endTime, isDlVerified, isPanVerified, panNumber, hasOverlap, paymentMode, cashCollector, depositType, depositItemName, isAgreementDone]);
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -361,6 +368,10 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     if (paymentMode === 'cash' && !cashCollector) { setError('Please select who collected the cash'); return; }
     if (car.type === 'inward' && (depositType === 'item' || depositType === 'both') && !depositItemName.trim()) {
       setError('Please enter the deposited item / bike model name');
+      return;
+    }
+    if (car.type === 'inward' && !isAgreementDone) {
+      setError('Please read and verify the Inward Rental Agreement via customer OTP before confirming booking');
       return;
     }
 
@@ -403,6 +414,7 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
           returnStatus: 'deposited',
         } : null,
         cashCollector: paymentMode === 'cash' ? cashCollector : '',
+        agreement: car.type === 'inward' ? agreementDetails : null,
       };
 
       if (paymentMode === 'razorpay') {
@@ -944,6 +956,89 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
             </div>
           </div>
 
+          {/* ── Inward Rental Agreement (Inward Only) ── */}
+          {car.type === 'inward' && (
+            <div
+              className="border rounded-xl p-4 space-y-3 transition-all"
+              style={{
+                borderColor: isAgreementDone ? '#10B981' : 'rgba(59, 130, 246, 0.4)',
+                backgroundColor: isAgreementDone ? 'rgba(16, 185, 129, 0.04)' : 'rgba(59, 130, 246, 0.03)',
+              }}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📜</span>
+                    <h3 className="text-sm font-bold uppercase tracking-wide" style={labelStyle}>
+                      Inward Rental Agreement
+                    </h3>
+                    {isAgreementDone ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-500/10 text-green-600 border border-green-500/20 flex items-center gap-1">
+                        ✓ Verified & Approved
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                        Agreement Pending
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs" style={{ color: colors.textSecondary }}>
+                    Rental agreement must be reviewed and approved via customer mobile OTP before car booking.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={!customerPhone || customerPhone.length < 10}
+                  onClick={() => setShowAgreementModal(true)}
+                  className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm flex-shrink-0 ${
+                    !customerPhone || customerPhone.length < 10
+                      ? 'opacity-40 cursor-not-allowed bg-gray-200 text-gray-500'
+                      : isAgreementDone
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30 shadow'
+                  }`}
+                >
+                  <span>📜</span>
+                  <span>{isAgreementDone ? 'View Approved Agreement' : 'Read Agreement'}</span>
+                  {!isAgreementDone && (!customerPhone || customerPhone.length < 10) && (
+                    <span className="text-[10px] ml-1 bg-black/20 px-1.5 py-0.5 rounded">🔒 Locked</span>
+                  )}
+                </button>
+              </div>
+
+              {/* Requirement Helper Alert */}
+              {(!customerPhone || customerPhone.length < 10) ? (
+                <div
+                  className="p-3 rounded-lg border text-xs flex items-center gap-2"
+                  style={{
+                    borderColor: 'rgba(239, 68, 68, 0.3)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                    color: colors.accentRed,
+                  }}
+                >
+                  <span>⚠️</span>
+                  <span>Please enter the 10-digit customer mobile number above to unlock & generate the agreement.</span>
+                </div>
+              ) : isAgreementDone && agreementDetails ? (
+                <div className="p-3 rounded-lg border text-xs space-y-1.5 bg-green-500/10 border-green-500/20 text-green-700">
+                  <div className="flex flex-wrap items-center justify-between font-bold gap-2">
+                    <span>Agreement Ref: {agreementDetails.agreementNumber}</span>
+                    <span className="bg-green-600 text-white px-2 py-0.5 rounded text-[10px]">
+                      ✓ Digitally Signed & Marked Done
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between text-gray-600 text-[11px]">
+                    <span>Verified Mobile: +91 {agreementDetails.phoneVerified || customerPhone}</span>
+                    <span>
+                      Approved On: {new Date(agreementDetails.verifiedAt || Date.now()).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+
           {/* ── Payment Options ── */}
           <div className="space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Payment Options</h3>
@@ -1069,6 +1164,38 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
           </Button>
         </div>
       </div>
+
+      {/* Inward Agreement Modal */}
+      <InwardAgreementModal
+        open={showAgreementModal}
+        onClose={() => setShowAgreementModal(false)}
+        bookingDetails={{
+          customerName,
+          customerPhone,
+          customerEmail,
+          licenseNumber,
+          panNumber,
+          aadhaarNumber,
+          car,
+          fromDate,
+          toDate,
+          startTime,
+          endTime,
+          numberOfDays,
+          totalPrice,
+          advanceAmount,
+          depositType,
+          deposit,
+          depositItemType,
+          depositItemName,
+        }}
+        existingAgreement={agreementDetails}
+        isAlreadyDone={isAgreementDone}
+        onMarkDone={(ag) => {
+          setIsAgreementDone(true);
+          setAgreementDetails(ag);
+        }}
+      />
     </div>
   );
 };

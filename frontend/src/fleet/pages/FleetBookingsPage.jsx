@@ -6,6 +6,7 @@ import { useFleet } from '../context/FleetContext';
 import { FLEET_BOOKING_FILTERS } from '../constants/fleetConstants';
 import api from '../../services/api';
 import CompleteBookingModal from '../components/CompleteBookingModal';
+import InwardAgreementModal from '../components/InwardAgreementModal';
 
 const RUPEE = '\u20B9';
 const DOT = '\u2022';
@@ -72,7 +73,17 @@ const getBookingStatus = (booking) => {
   return 'active';
 };
 
+const InfoItem = ({ label, value, valueClass = '' }) => (
+  <div className="flex flex-col">
+    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: colors.textSecondary }}>{label}</span>
+    <span className={`text-sm font-semibold mt-1 ${valueClass}`} style={{ color: valueClass ? undefined : colors.textPrimary }}>
+      {value || '-'}
+    </span>
+  </div>
+);
+
 const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
   if (!open || !booking) return null;
 
   const bookingStatus = booking.status || getBookingStatus(booking);
@@ -97,6 +108,20 @@ const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
   const car = cars.find(c => c.id === booking.carId);
   const displayCarNumber = car?.registrationNumber || booking.carId;
 
+  const numberOfDays = (() => {
+    if (!booking.fromDate || !booking.toDate) return 1;
+    try {
+      const d1 = new Date(booking.fromDate);
+      const d2 = new Date(booking.toDate);
+      const diff = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
+      return diff > 0 ? diff : 1;
+    } catch {
+      return 1;
+    }
+  })();
+
+  const isInwardBooking = booking.carType === 'inward' || Boolean(booking.agreement) || !booking.carType;
+
   // Graceful fallback for older bookings that don't have explicit mode fields
   const getAdvanceMode = () => {
     if (booking.advancePaymentMode) return booking.advancePaymentMode;
@@ -111,15 +136,6 @@ const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
     if (booking.paymentMode.includes(' & ')) return booking.paymentMode.split(' & ')[1];
     return booking.paymentMode;
   };
-
-  const InfoItem = ({ label, value, valueClass = '' }) => (
-    <div className="flex flex-col">
-      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: colors.textSecondary }}>{label}</span>
-      <span className={`text-sm font-semibold mt-1 ${valueClass}`} style={{ color: valueClass ? undefined : colors.textPrimary }}>
-        {value || '-'}
-      </span>
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -248,6 +264,55 @@ const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
                       {booking.aadhaarNumber ? `XXXX-XXXX-${booking.aadhaarNumber.slice(-4)}` : 'Not provided'}
                     </span>
                   </div>
+
+                  {/* Inward Rental Agreement */}
+                  {isInwardBooking && (
+                    <div
+                      className="p-4 rounded-xl border transition-all"
+                      style={{
+                        borderColor: 'rgba(16, 185, 129, 0.4)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                      }}
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-bold text-sm flex items-center gap-1.5" style={{ color: colors.textPrimary }}>
+                          <span>📜</span> Rental Agreement
+                        </span>
+                        {booking.agreement?.status === 'verified' || booking.agreement?.status === 'done' || booking.agreement?.approvedByOtp ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-green-100 text-green-700 flex items-center gap-1">
+                            <span>✓</span> Verified & Signed
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                            Available
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs mb-3">
+                        <span className="font-mono text-xs font-semibold" style={{ color: colors.textSecondary }}>
+                          {booking.agreement?.agreementNumber || `AGR-INW-${(booking.customerPhone || '0000').slice(-4)}`}
+                        </span>
+                        <span className="text-[11px] text-green-600 font-semibold">
+                          📱 Approved via OTP
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => setShowAgreementModal(true)}
+                        type="button"
+                        className="w-full py-2.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm hover:opacity-90 cursor-pointer"
+                        style={{
+                          backgroundColor: colors.backgroundTertiary,
+                          color: colors.textWhite,
+                        }}
+                      >
+                        <span>📜</span>
+                        <span>See Agreement</span>
+                        <span>→</span>
+                      </button>
+                    </div>
+                  )}
 
                 </div>
               </Card>
@@ -412,11 +477,57 @@ const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
                 </Card>
               )}
 
+
             </div>
           </div>
 
         </div>
       </div>
+
+      {/* Inward Agreement Modal */}
+      {showAgreementModal && (
+        <InwardAgreementModal
+          open={showAgreementModal}
+          onClose={() => setShowAgreementModal(false)}
+          bookingDetails={{
+            customerName: booking.customerName,
+            customerPhone: booking.customerPhone,
+            customerEmail: booking.customerEmail,
+            licenseNumber: booking.licenseNumber,
+            panNumber: booking.panNumber,
+            aadhaarNumber: booking.aadhaarNumber,
+            car: car || {
+              name: booking.carName,
+              registrationNumber: displayCarNumber,
+              carNumber: displayCarNumber,
+              pricePerDay: Math.round(Number(booking.totalPrice || 0) / (numberOfDays || 1)) || 1000,
+            },
+            fromDate: booking.fromDate,
+            toDate: booking.toDate,
+            startTime: booking.startTime || '10:00 AM',
+            endTime: booking.endTime || '10:00 AM',
+            numberOfDays: numberOfDays,
+            totalPrice: booking.totalPrice,
+            advanceAmount: booking.advanceAmount,
+            depositType: booking.depositType,
+            deposit: booking.deposit,
+            depositItemType: booking.depositItem?.itemType,
+            depositItemName: booking.depositItem?.itemName,
+          }}
+          existingAgreement={
+            booking.agreement || {
+              agreementNumber: `AGR-INW-${(booking.customerPhone || '0000').slice(-4)}`,
+              status: 'verified',
+              phoneVerified: booking.customerPhone,
+              verifiedAt: booking.createdAt || new Date(),
+              termsAccepted: true,
+              approvedByOtp: true,
+            }
+          }
+          isAlreadyDone={true}
+          onMarkDone={() => setShowAgreementModal(false)}
+        />
+      )}
     </div>
   );
 };
@@ -590,6 +701,17 @@ const FleetBookingsPage = () => {
                           Aadhaar Not Provided
                         </span>
                       )}
+                      {b.carType === 'inward' && (
+                        b.agreement?.status === 'verified' || b.agreement?.status === 'done' || b.agreement?.approvedByOtp ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            ✓ Agreement Approved
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            Agreement Pending
+                          </span>
+                        )
+                      )}
                     </div>
                   </div>
 
@@ -692,18 +814,22 @@ const FleetBookingsPage = () => {
         )}
       </div>
 
-      <BookingDetailsModal
-        open={!!selectedBooking}
-        booking={selectedBooking}
-        cars={cars}
-        onClose={() => setSelectedBooking(null)}
-      />
-      <CompleteBookingModal
-        open={Boolean(completingBooking)}
-        booking={completingBooking}
-        onClose={() => setCompletingBooking(null)}
-        onConfirm={(updatedData) => updateBookingInContext(completingBooking.id, updatedData)}
-      />
+      {selectedBooking && (
+        <BookingDetailsModal
+          open={!!selectedBooking}
+          booking={selectedBooking}
+          cars={cars}
+          onClose={() => setSelectedBooking(null)}
+        />
+      )}
+      {completingBooking && (
+        <CompleteBookingModal
+          open={Boolean(completingBooking)}
+          booking={completingBooking}
+          onClose={() => setCompletingBooking(null)}
+          onConfirm={(updatedData) => updateBookingInContext(completingBooking.id, updatedData)}
+        />
+      )}
     </div>
   );
 };

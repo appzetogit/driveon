@@ -673,7 +673,30 @@ const DriverAssignmentPage = () => {
                   </div>
                 )}
 
-
+                {/* Starting Meter KM if recorded */}
+                {selectedBookingForDetails.startKm != null && (
+                  <div className="space-y-2">
+                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block">Odometer / Meter Reading</span>
+                    <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-sm shadow-sm">
+                          🚗
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-indigo-900 font-bold uppercase block leading-none">Starting Meter</span>
+                          <span className="font-extrabold text-[#1C205C] text-sm font-mono mt-0.5 inline-block">
+                            {Number(selectedBookingForDetails.startKm).toLocaleString()} KM
+                          </span>
+                        </div>
+                      </div>
+                      {selectedBookingForDetails.startKmEnteredAt && (
+                        <span className="text-[10px] text-gray-500 font-medium">
+                          {new Date(selectedBookingForDetails.startKmEnteredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Customer Notes */}
                 {selectedBookingForDetails.specialRequests && (

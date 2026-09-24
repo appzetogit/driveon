@@ -53,6 +53,10 @@ const BookingsPage = () => {
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'All'); // 'All', 'Not Started', 'Ongoing', 'Completed'
   const [selectedBookingForDetails, setSelectedBookingForDetails] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [startTripModalBooking, setStartTripModalBooking] = useState(null);
+  const [startKmInput, setStartKmInput] = useState('');
+  const [startKmError, setStartKmError] = useState('');
+
   useEffect(() => {
     window.scrollTo(0, 0);
     fetchAssignedBookings();
@@ -73,12 +77,17 @@ const BookingsPage = () => {
     }
   };
 
-  const handleStartTrip = async (bookingId) => {
+  const handleStartTrip = async (bookingId, startKm) => {
     try {
       setActionLoading(bookingId);
-      const response = await api.post(`/bookings/${bookingId}/start`);
+      const response = await api.post(`/bookings/${bookingId}/start`, {
+        startKm: Number(startKm),
+      });
       if (response.data.success) {
-        toastUtils.success('🚀 Trip started successfully!');
+        toastUtils.success(`🚀 Trip started successfully! Start KM: ${startKm}`);
+        setStartTripModalBooking(null);
+        setStartKmInput('');
+        setStartKmError('');
         fetchAssignedBookings();
       }
     } catch (error) {
@@ -302,6 +311,24 @@ const BookingsPage = () => {
                     </div>
                   </div>
 
+                  {/* Starting Kilometer Badge if recorded */}
+                  {booking.startKm != null && (
+                    <div className="bg-indigo-50/70 p-2.5 rounded-2xl border border-indigo-100/80 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">🚗</span>
+                        <div>
+                          <p className="text-[9px] text-indigo-800 font-bold uppercase leading-none">Starting Meter</p>
+                          <p className="font-extrabold text-[#1C205C] text-xs mt-0.5 font-mono">
+                            {Number(booking.startKm).toLocaleString()} KM
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] bg-white text-indigo-700 px-2 py-0.5 rounded-full font-bold border border-indigo-100 shadow-2xs">
+                        Recorded
+                      </span>
+                    </div>
+                  )}
+
                   {/* Sequential 4-Step Action Buttons */}
                   <div className="pt-3 border-t border-gray-50">
                     {(() => {
@@ -312,13 +339,14 @@ const BookingsPage = () => {
                         </span>
                       );
 
-                      // STEP 1: Start Trip → calls /start API immediately
+                      // STEP 1: Start Trip → opens modal asking for current vehicle KM
                       if (!booking.tripStatus || booking.tripStatus === 'not_started') return (
                         <button
                           disabled={actionLoading === booking._id}
                           onClick={() => {
-                            if (!window.confirm('Start Trip — Are you heading to pick up the customer?')) return;
-                            handleStartTrip(booking._id);
+                            setStartTripModalBooking(booking);
+                            setStartKmInput('');
+                            setStartKmError('');
                           }}
                           className="w-full bg-[#1C205C] hover:bg-[#2c3180] disabled:opacity-50 text-white py-3 rounded-xl font-bold text-xs shadow-md shadow-blue-900/10 active:scale-95 transition-all flex items-center justify-center gap-1.5"
                         >
@@ -470,6 +498,31 @@ const BookingsPage = () => {
 
 
 
+                {/* Odometer / Start Meter Reading in Details Modal */}
+                {selectedBookingForDetails.startKm != null && (
+                  <div className="space-y-1">
+                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block">Odometer / Meter Reading</span>
+                    <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
+                          🚗
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-gray-400 font-bold uppercase">Start Meter</p>
+                          <h6 className="font-extrabold text-[#1C205C] text-sm font-mono">
+                            {Number(selectedBookingForDetails.startKm).toLocaleString()} KM
+                          </h6>
+                        </div>
+                      </div>
+                      {selectedBookingForDetails.startKmEnteredAt && (
+                        <span className="text-[10px] text-gray-500 font-medium">
+                          {new Date(selectedBookingForDetails.startKmEnteredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Customer Notes */}
                 {selectedBookingForDetails.specialRequests && (
                   <div className="space-y-1">
@@ -491,6 +544,151 @@ const BookingsPage = () => {
                   Close Details
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Start Trip Meter (KM) Modal */}
+      <AnimatePresence>
+        {startTripModalBooking && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (actionLoading !== startTripModalBooking._id) {
+                  setStartTripModalBooking(null);
+                  setStartKmInput('');
+                  setStartKmError('');
+                }
+              }}
+              className="absolute inset-0 bg-[#0f172a]/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative bg-white rounded-[28px] shadow-2xl w-full max-w-sm overflow-hidden z-10 p-5 text-gray-800 border border-gray-100"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-[#1C205C] flex items-center justify-center text-lg font-black shrink-0">
+                    🚗
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-[#1C205C]">Start Trip — Enter Meter KM</h3>
+                    <p className="text-[10px] text-gray-400 font-semibold">Booking #{startTripModalBooking.bookingId}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={actionLoading === startTripModalBooking._id}
+                  onClick={() => {
+                    setStartTripModalBooking(null);
+                    setStartKmInput('');
+                    setStartKmError('');
+                  }}
+                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
+                >
+                  <MdClose size={18} />
+                </button>
+              </div>
+
+              {/* Car details badge */}
+              {startTripModalBooking.car && (
+                <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase">Assigned Vehicle</p>
+                    <p className="text-xs font-bold text-gray-800">
+                      {startTripModalBooking.car.brand} {startTripModalBooking.car.model}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono font-black bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 uppercase">
+                    {startTripModalBooking.car.registrationNumber || 'N/A'}
+                  </span>
+                </div>
+              )}
+
+              {/* Form Input */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const val = Number(startKmInput);
+                  if (!startKmInput || isNaN(val) || val <= 0) {
+                    setStartKmError('Please enter a valid meter reading greater than 0');
+                    return;
+                  }
+                  setStartKmError('');
+                  handleStartTrip(startTripModalBooking._id, val);
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                    Current Meter Reading (KM) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="1"
+                      step="any"
+                      autoFocus
+                      required
+                      placeholder="e.g. 45200"
+                      value={startKmInput}
+                      onChange={(e) => {
+                        setStartKmInput(e.target.value);
+                        if (startKmError) setStartKmError('');
+                      }}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 focus:border-[#1C205C] focus:bg-white rounded-xl text-base font-extrabold text-[#1C205C] font-mono outline-none transition-all pr-14"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400 bg-gray-200/60 px-2 py-1 rounded-md">
+                      KM
+                    </span>
+                  </div>
+                  {startKmError && (
+                    <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
+                      <FiInfo size={11} /> {startKmError}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-gray-400 font-medium mt-1.5">
+                    💡 Please enter the exact kilometer reading currently visible on the vehicle odometer.
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="grid grid-cols-2 gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    disabled={actionLoading === startTripModalBooking._id}
+                    onClick={() => {
+                      setStartTripModalBooking(null);
+                      setStartKmInput('');
+                      setStartKmError('');
+                    }}
+                    className="w-full py-2.5 px-3 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 font-bold text-xs rounded-xl transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={actionLoading === startTripModalBooking._id || !startKmInput}
+                    className="w-full py-2.5 px-3 bg-[#1C205C] hover:bg-[#2c3180] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-900/10 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    {actionLoading === startTripModalBooking._id ? (
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+                    ) : (
+                      <>
+                        <FiPlay fill="currentColor" size={10} /> Submit &amp; Start
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

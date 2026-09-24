@@ -444,6 +444,13 @@ const DriverRecordPage = () => {
                                         <span className="text-[8px] bg-blue-50 text-blue-700 px-1 py-0.2 rounded font-black border border-blue-100/50 uppercase font-mono tracking-wider">
                                           {booking.car.registrationNumber || 'N/A'}
                                         </span>
+                                        {booking.startKm != null && (
+                                          <div>
+                                            <span className="text-[9px] font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 mt-1 inline-block">
+                                              🚗 {Number(booking.startKm).toLocaleString()} KM
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
                                     ) : (
                                       <span className="text-gray-400 italic">No vehicle</span>

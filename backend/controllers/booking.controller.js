@@ -1083,12 +1083,25 @@ export const startTrip = async (req, res) => {
       });
     }
 
+    // Validate starting kilometer reading
+    const { startKm } = req.body;
+    const parsedStartKm = Number(startKm);
+    if (startKm === undefined || startKm === null || startKm === '' || isNaN(parsedStartKm) || parsedStartKm < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid meter reading (KM) to start the trip',
+      });
+    }
+
     // Update booking
     booking.status = 'active';
     booking.tripStatus = 'started';
     booking.isTrackingActive = true;
     booking.trackingStartedAt = new Date();
     booking.tripStartedAt = new Date();
+    booking.startKm = parsedStartKm;
+    booking.startKmEnteredAt = new Date();
+    booking.startKmEnteredBy = userId;
 
     await booking.save();
 

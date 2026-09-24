@@ -36,7 +36,36 @@ const AdminSidebar = () => {
       ),
       path: '/admin/users',
     },
-
+    {
+      id: 'bookings',
+      title: 'Bookings',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+      path: '/admin/bookings',
+    },
+    {
+      id: 'fleet-inward-bookings',
+      title: 'Inward Bookings',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+      path: '/admin/fleet/inward-bookings',
+    },
+    {
+      id: 'driver-assignment',
+      title: 'Driver Assign',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ),
+      path: '/admin/bookings/driver-assignment',
+    },
     {
       id: 'guarantors',
       title: 'Guarantors',
@@ -79,7 +108,6 @@ const AdminSidebar = () => {
       ),
       path: '/admin/online-cars',
     },
-
     {
       id: 'fleet-inward',
       title: 'Fleet: Inward Cars',
@@ -89,37 +117,6 @@ const AdminSidebar = () => {
         </svg>
       ),
       path: '/admin/fleet/inward',
-    },
-    {
-      id: 'fleet-inward-bookings',
-      title: 'Fleet: Inward Bookings',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-      ),
-      path: '/admin/fleet/inward-bookings',
-    },
-
-    {
-      id: 'bookings',
-      title: 'Bookings',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-      ),
-      path: '/admin/bookings',
-    },
-    {
-      id: 'driver-assignment',
-      title: 'Driver Assign',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-      ),
-      path: '/admin/bookings/driver-assignment',
     },
     {
       id: 'payments',
@@ -285,9 +282,9 @@ const AdminSidebar = () => {
 
   const filteredMenuItems = adminUser?.role === 'subadmin'
     ? menuItems.filter(item => {
-        const key = `admin:${item.id}`;
-        return adminUser.permissions?.includes(key);
-      })
+      const key = `admin:${item.id}`;
+      return adminUser.permissions?.includes(key);
+    })
     : menuItems;
 
   return (
@@ -380,17 +377,6 @@ const AdminSidebar = () => {
             })}
           </div>
         </nav>
-
-        {/* Footer Section */}
-        <div
-          className="border-t p-4 flex-shrink-0"
-          style={{ borderTopColor: colors.borderMedium }}
-        >
-          <div className="text-xs text-center" style={{ color: colors.textSecondary }}>
-            <p>DriveOn Admin</p>
-            <p className="mt-1">Version 1.0</p>
-          </div>
-        </div>
       </aside>
     </>
   );

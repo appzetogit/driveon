@@ -163,6 +163,32 @@ const outwardBookingSchema = new mongoose.Schema(
       type: String,
       enum: ['active', 'completed', 'cancelled'],
       default: 'active',
+    },
+    agreement: {
+      agreementNumber: {
+        type: String,
+        default: '',
+      },
+      status: {
+        type: String,
+        enum: ['none', 'pending', 'verified', 'done'],
+        default: 'none',
+      },
+      phoneVerified: {
+        type: String,
+        default: '',
+      },
+      verifiedAt: {
+        type: Date,
+      },
+      termsAccepted: {
+        type: Boolean,
+        default: false,
+      },
+      approvedByOtp: {
+        type: Boolean,
+        default: false,
+      },
     }
   },
   {

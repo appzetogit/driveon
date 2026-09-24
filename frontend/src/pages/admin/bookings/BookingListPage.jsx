@@ -199,6 +199,9 @@ const BookingListPage = () => {
           remainingAmount: booking.remainingAmount || 0,
           assignedDriver: booking.assignedDriver || null,
           addOnServices: booking.addOnServices || {},
+          startKm: booking.startKm ?? booking.originalData?.startKm ?? null,
+          startKmEnteredAt: booking.startKmEnteredAt ?? booking.originalData?.startKmEnteredAt ?? null,
+          startKmEnteredBy: booking.startKmEnteredBy ?? booking.originalData?.startKmEnteredBy ?? null,
         })) || [];
 
         setBookings(transformedBookings);
@@ -1138,6 +1141,11 @@ const BookingListPage = () => {
                       {booking.status === 'completed' && booking.completedDate && (
                         <span>Completed: {new Date(booking.completedDate).toLocaleString()}</span>
                       )}
+                      {(booking.startKm != null || booking.originalData?.startKm != null) && (
+                        <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold border border-indigo-200 text-xs inline-flex items-center gap-1">
+                          🚗 Start: {Number(booking.startKm ?? booking.originalData?.startKm).toLocaleString()} KM
+                        </span>
+                      )}
                       {booking.status === 'cancelled' && booking.cancellationReason && (
                         <span className="text-red-600">Reason: {booking.cancellationReason}</span>
                       )}
@@ -1622,6 +1630,33 @@ const BookingDetailModal = ({ booking, addOnPrices = {}, onClose, onApprove, onR
                         <p className="text-sm text-green-600 font-medium">📍 {booking.currentLocation}</p>
                       </div>
                     )}
+                    {/* Driver Start Meter Reading (KM) */}
+                    <div className="col-span-2 bg-indigo-50/70 p-3.5 rounded-xl border border-indigo-100">
+                      <label className="text-xs font-bold text-indigo-950 uppercase tracking-wider block mb-1">
+                        Driver Start Meter Reading (KM)
+                      </label>
+                      {(booking.startKm != null || booking.originalData?.startKm != null) ? (
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-black bg-indigo-600 text-white shadow-sm font-mono">
+                            <span>🚗</span> {Number(booking.startKm ?? booking.originalData?.startKm).toLocaleString()} KM
+                          </span>
+                          {(booking.startKmEnteredAt || booking.originalData?.startKmEnteredAt) && (
+                            <span className="text-xs text-indigo-800 font-medium">
+                              Recorded: {new Date(booking.startKmEnteredAt || booking.originalData?.startKmEnteredAt).toLocaleDateString()} at {new Date(booking.startKmEnteredAt || booking.originalData?.startKmEnteredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                          {(booking.startKmEnteredBy || booking.originalData?.startKmEnteredBy) && (
+                            <span className="text-xs text-gray-600 font-semibold">
+                              (Driver: {(booking.startKmEnteredBy || booking.originalData?.startKmEnteredBy).name || (booking.startKmEnteredBy || booking.originalData?.startKmEnteredBy).employeeId || 'Assigned Driver'})
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500 italic mt-0.5">
+                          Trip has not been started yet from driver app / No meter reading recorded.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1973,6 +2008,21 @@ const BookingDetailModal = ({ booking, addOnPrices = {}, onClose, onApprove, onR
                     <div className="p-3 bg-green-50 rounded-lg">
                       <p className="text-sm font-medium text-gray-900">Trip Started</p>
                       <p className="text-xs text-gray-500">Pickup: {new Date(booking.pickupDate).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  {(booking.startKm != null || booking.originalData?.startKm != null) && (
+                    <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-indigo-900">🚗 Driver Started Trip &amp; Meter Logged</p>
+                        <span className="text-xs font-black text-indigo-700 font-mono bg-indigo-100 px-2 py-0.5 rounded">
+                          {Number(booking.startKm ?? booking.originalData?.startKm).toLocaleString()} KM
+                        </span>
+                      </div>
+                      <p className="text-xs text-indigo-600 mt-0.5">
+                        {booking.startKmEnteredAt || booking.originalData?.startKmEnteredAt
+                          ? new Date(booking.startKmEnteredAt || booking.originalData?.startKmEnteredAt).toLocaleString()
+                          : 'Recorded at trip start'}
+                      </p>
                     </div>
                   )}
                   {booking.status === 'completed' && booking.completedDate && (

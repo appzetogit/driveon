@@ -302,6 +302,19 @@ const bookingSchema = new mongoose.Schema(
     tripEndedAt: {
       type: Date,
     },
+    startKm: {
+      type: Number,
+      default: null,
+    },
+    startKmEnteredAt: {
+      type: Date,
+      default: null,
+    },
+    startKmEnteredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Staff',
+      default: null,
+    },
 
     // Location Tracking
     isTrackingActive: {

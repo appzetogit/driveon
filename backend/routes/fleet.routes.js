@@ -14,7 +14,12 @@ import {
     verifyFleetPAN,
     cancelOutwardBooking,
     completeOutwardBooking,
-    payOutwardBooking
+    payOutwardBooking,
+    sendAgreementOTP,
+    verifyAgreementOTP,
+    getFleetAgreements,
+    getAgreementTemplate,
+    updateAgreementTemplate
 } from '../controllers/fleet.controller.js';
 
 const router = express.Router();
@@ -39,6 +44,13 @@ router.post('/kyc/aadhaar/generate-otp', generateFleetAadhaarOTP);
 router.post('/kyc/aadhaar/verify-otp', verifyFleetAadhaarOTP);
 router.post('/kyc/dl/verify', verifyFleetDL);
 router.post('/kyc/pan/verify', verifyFleetPAN);
+
+// Inward Rental Agreement verification endpoints
+router.post('/agreement/send-otp', sendAgreementOTP);
+router.post('/agreement/verify-otp', verifyAgreementOTP);
+router.get('/agreements', getFleetAgreements);
+router.get('/agreement-template', getAgreementTemplate);
+router.put('/agreement-template', updateAgreementTemplate);
 
 // Booking state changes
 router.post('/outward-bookings/:id/cancel', cancelOutwardBooking);
