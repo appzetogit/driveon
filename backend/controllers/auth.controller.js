@@ -88,7 +88,8 @@ export const register = async (req, res) => {
     const { fcmToken, platform } = req.body;
     const fcmData = {};
     if (fcmToken) {
-      if (platform === 'mobile') {
+      const isMobile = ['mobile', 'android', 'ios'].includes(String(platform || '').toLowerCase());
+      if (isMobile) {
         fcmData.fcmTokenMobile = fcmToken;
       } else {
         fcmData.fcmToken = fcmToken;
@@ -585,6 +586,8 @@ export const verifyOTP = async (req, res) => {
       } else {
         if (signup.phone) user.isPhoneVerified = true;
         if (signup.email) user.isEmailVerified = true;
+        if (signup.fcmToken) user.fcmToken = signup.fcmToken;
+        if (signup.fcmTokenMobile) user.fcmTokenMobile = signup.fcmTokenMobile;
         await user.save();
       }
     } else {
@@ -659,7 +662,8 @@ export const verifyOTP = async (req, res) => {
     // Handle FCM Token update if provided during login/verification
     const { fcmToken, platform } = req.body;
     if (fcmToken) {
-      if (platform === 'mobile') {
+      const isMobile = ['mobile', 'android', 'ios'].includes(String(platform || '').toLowerCase());
+      if (isMobile) {
         user.fcmTokenMobile = fcmToken;
       } else {
         user.fcmToken = fcmToken;
@@ -781,7 +785,8 @@ export const staffLogin = async (req, res) => {
     // Handle FCM Token update if provided during login
     const { fcmToken, platform } = req.body;
     if (fcmToken) {
-      if (platform === 'mobile') {
+      const isMobile = ['mobile', 'android', 'ios'].includes(String(platform || '').toLowerCase());
+      if (isMobile) {
         staff.fcmTokenMobile = fcmToken;
       } else {
         staff.fcmToken = fcmToken;
@@ -1328,12 +1333,8 @@ export const saveStaffFcmToken = async (req, res) => {
       });
     }
 
-    const updateData = {};
-    if (platform === "mobile") {
-      updateData.fcmTokenMobile = fcmToken;
-    } else {
-      updateData.fcmToken = fcmToken;
-    }
+    const isMobile = ['mobile', 'android', 'ios'].includes(String(platform || '').toLowerCase());
+    const updateData = isMobile ? { fcmTokenMobile: fcmToken } : { fcmToken: fcmToken };
 
     const staff = await Staff.findByIdAndUpdate(
       staffId,
@@ -1384,23 +1385,29 @@ export const saveUserFcmToken = async (req, res) => {
       });
     }
 
-    const updateData = {};
-    if (platform === "mobile") {
-      updateData.fcmTokenMobile = fcmToken;
-    } else {
-      updateData.fcmToken = fcmToken;
-    }
+    const isMobile = ['mobile', 'android', 'ios'].includes(String(platform || '').toLowerCase());
+    const updateData = isMobile ? { fcmTokenMobile: fcmToken } : { fcmToken: fcmToken };
 
-    const user = await User.findByIdAndUpdate(
+    let user = await User.findByIdAndUpdate(
       userId,
       { $set: updateData },
       { new: true }
     );
 
+    // If not found in User collection, try Staff collection
+    if (!user) {
+      const Staff = (await import('../models/Staff.js')).default;
+      user = await Staff.findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        { new: true }
+      );
+    }
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: "User or Staff not found",
       });
     }
 

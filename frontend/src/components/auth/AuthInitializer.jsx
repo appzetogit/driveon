@@ -198,21 +198,40 @@ const AuthInitializer = ({ children }) => {
     if (isAuthenticated && user && (user._id || user.id) && !isEmployeeApp) {
       console.log('🔔 Setting up FCM for user:', user.name);
 
+      const saveTokenToBackend = async (token, platform) => {
+        if (!token) return;
+        try {
+          await api.post('/auth/user-fcm-token', {
+            fcmToken: token,
+            platform: platform
+          }).catch(err => console.warn('Note: /auth/user-fcm-token:', err.message));
+
+          await api.post('/user/fcm-token', {
+            fcmToken: token,
+            platform: platform
+          }).catch(err => console.warn('Note: /user/fcm-token:', err.message));
+
+          console.log(`✅ User FCM Token saved via AuthInitializer (${platform})`);
+        } catch (error) {
+          console.error("❌ Error saving user FCM token:", error);
+        }
+      };
+
       // Request and Save Token
-      requestForToken().then(async (token) => {
+      requestForToken().then((token) => {
         if (token) {
           const platform = isMobileApp() ? 'mobile' : 'web';
-          try {
-            await api.post('/auth/user-fcm-token', {
-              fcmToken: token,
-              platform: platform
-            });
-            console.log(`✅ User FCM Token saved via AuthInitializer (${platform})`);
-          } catch (error) {
-            console.error("❌ Error saving user FCM token:", error);
-          }
+          saveTokenToBackend(token, platform);
         }
       });
+
+      // Listen for dynamically injected mobile token
+      const handleMobileFcmToken = (e) => {
+        if (e.detail) {
+          saveTokenToBackend(e.detail, 'mobile');
+        }
+      };
+      window.addEventListener('mobileFcmTokenReady', handleMobileFcmToken);
 
       // Listen for foreground messages
       onMessageListener()
@@ -223,6 +242,10 @@ const AuthInitializer = ({ children }) => {
           }
         })
         .catch((err) => console.error("FCM Listener error: ", err));
+
+      return () => {
+        window.removeEventListener('mobileFcmTokenReady', handleMobileFcmToken);
+      };
     }
   }, [isAuthenticated, user]);
 

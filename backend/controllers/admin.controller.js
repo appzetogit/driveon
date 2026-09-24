@@ -192,12 +192,13 @@ export const adminLogin = async (req, res) => {
 
     // Save FCM Token if present
     if (fcmToken) {
-      if (platform === 'mobile') {
+      const isMobile = ['mobile', 'android', 'ios'].includes(String(platform || '').toLowerCase());
+      if (isMobile) {
         admin.fcmTokenMobile = fcmToken;
       } else {
         admin.fcmToken = fcmToken;
       }
-      console.log(`✅ Admin FCM Token updated for ${admin.name} [${platform || 'web'}]`);
+      console.log(`✅ Admin FCM Token updated for ${admin.name} [${isMobile ? 'mobile' : 'web'}]`);
     }
 
     await admin.save({ validateBeforeSave: false }); // One save call for both lastLogin and FCM

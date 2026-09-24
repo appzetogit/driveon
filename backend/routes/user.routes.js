@@ -107,11 +107,20 @@ router.post('/user/fcm-token', async (req, res) => {
     const { fcmToken, platform } = req.body;
     const userId = req.user._id;
 
-    const updateField = platform === 'mobile' ? { fcmTokenMobile: fcmToken } : { fcmToken: fcmToken };
+    if (!fcmToken) {
+      return res.status(400).json({ success: false, message: 'FCM Token is required' });
+    }
+
+    const isMobile = ['mobile', 'android', 'ios'].includes(String(platform || '').toLowerCase());
+    const updateField = isMobile ? { fcmTokenMobile: fcmToken } : { fcmToken: fcmToken };
 
     // Use importing locally to avoid circular dependencies if any
     const User = (await import('../models/User.js')).default;
-    await User.findByIdAndUpdate(userId, updateField);
+    let user = await User.findByIdAndUpdate(userId, updateField, { new: true });
+    if (!user) {
+      const Staff = (await import('../models/Staff.js')).default;
+      user = await Staff.findByIdAndUpdate(userId, updateField, { new: true });
+    }
 
     res.json({ success: true, message: 'FCM Token Saved' });
   } catch (error) {

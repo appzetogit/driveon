@@ -39,13 +39,21 @@ export const isMobileApp = () => {
 // Intercept URL parameters on load to capture mobile FCM token
 if (typeof window !== 'undefined') {
     try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const fcmTokenParam = urlParams.get('fcmToken') || urlParams.get('fcm_token') || urlParams.get('deviceToken') || urlParams.get('device_token');
-        const platformParam = urlParams.get('platform');
+        const searchParams = new URLSearchParams(window.location.search);
+        let fcmTokenParam = searchParams.get('fcmToken') || searchParams.get('fcm_token') || searchParams.get('deviceToken') || searchParams.get('device_token');
+        let platformParam = searchParams.get('platform');
+
+        // Fallback check in hash if present (e.g. /#/?fcmToken=...)
+        if (!fcmTokenParam && window.location.hash && window.location.hash.includes('?')) {
+            const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
+            fcmTokenParam = hashParams.get('fcmToken') || hashParams.get('fcm_token') || hashParams.get('deviceToken') || hashParams.get('device_token');
+            if (!platformParam) platformParam = hashParams.get('platform');
+        }
 
         if (fcmTokenParam) {
-            console.log('📱 Captured FCM Token from URL search parameters:', fcmTokenParam.substring(0, 10) + '...');
+            console.log('📱 Captured FCM Token from URL parameters:', fcmTokenParam.substring(0, 10) + '...');
             localStorage.setItem('mobileFcmToken', fcmTokenParam);
+            window.mobileFcmToken = fcmTokenParam;
         }
         if (platformParam) {
             localStorage.setItem('mobilePlatform', platformParam);
@@ -61,7 +69,11 @@ if (typeof window !== 'undefined') {
         if (!token) return;
         console.log('📱 Received FCM Token from native shell:', token.substring(0, 10) + '...');
         localStorage.setItem('mobileFcmToken', token);
+        window.mobileFcmToken = token;
         localStorage.setItem('mobilePlatform', 'mobile');
+
+        // Dispatch custom event so listeners (e.g. AuthInitializer, LoginPage) can react immediately
+        window.dispatchEvent(new CustomEvent('mobileFcmTokenReady', { detail: token }));
 
         // Dynamically save token if already authenticated
         try {
@@ -73,7 +85,7 @@ if (typeof window !== 'undefined') {
                 await api.post('/auth/staff-fcm-token', {
                     fcmToken: token,
                     platform: 'mobile'
-                });
+                }).catch(e => console.error('Staff FCM save error:', e));
                 console.log('✅ Registered native staff FCM token to backend');
             }
 
@@ -97,20 +109,32 @@ if (typeof window !== 'undefined') {
 }
 
 export const requestForToken = async () => {
-    // If running in a mobile app, retrieve the native device token
-    if (isMobileApp()) {
-        const cachedToken = localStorage.getItem('mobileFcmToken') || 
-                            (typeof window !== 'undefined' ? (window.mobileFcmToken || window.fcmToken) : null);
-        if (cachedToken) {
-            console.log('📱 Returning cached/injected mobile FCM Token:', cachedToken.substring(0, 10) + '...');
-            return cachedToken;
-        }
-        console.log('📱 Running in mobile WebView but no native FCM token is cached yet.');
+    // 1. Check for cached or native injected mobile token first
+    const cachedToken = typeof window !== 'undefined' ? (
+        localStorage.getItem('mobileFcmToken') || window.mobileFcmToken || window.fcmToken
+    ) : null;
+
+    if (cachedToken) {
+        console.log('📱 Returning cached/injected mobile FCM Token:', cachedToken.substring(0, 10) + '...');
+        return cachedToken;
+    }
+
+    // 2. If running inside a dedicated native shell without cached token yet, log and wait/return null
+    const hasNativeShell = typeof window !== 'undefined' && (
+        window.cordova !== undefined ||
+        window.Capacitor !== undefined ||
+        window.flutter_inappwebview !== undefined
+    );
+
+    if (hasNativeShell) {
+        console.log('📱 Running in native mobile shell (Flutter/Capacitor) but no token cached yet.');
         return null;
     }
 
+    // 3. Web Push Notification flow (Desktop / Mobile browsers)
     try {
         if (!VAPID_KEY) {
+            console.warn('⚠️ Missing VITE_FIREBASE_VAPID_KEY in environment.');
             return null;
         }
 
@@ -122,6 +146,23 @@ export const requestForToken = async () => {
 
         // Check if notification permission is already denied — skip silently
         if (window.Notification.permission === 'denied') {
+            console.log('🔔 Notification permission has been denied by the user.');
+            return null;
+        }
+
+        // 🔥 CRITICAL: If permission is 'default' (e.g. live server first visit), request permission!
+        let permission = window.Notification.permission;
+        if (permission === 'default') {
+            try {
+                permission = await Notification.requestPermission();
+                console.log('🔔 Notification permission prompt result:', permission);
+            } catch (pErr) {
+                console.warn('⚠️ Notification.requestPermission() failed:', pErr);
+            }
+        }
+
+        if (permission !== 'granted') {
+            console.log('🔔 Notification permission was not granted:', permission);
             return null;
         }
 
@@ -130,6 +171,8 @@ export const requestForToken = async () => {
         try {
             if ('serviceWorker' in navigator) {
                 registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                // Ensure SW is active or ready
+                await navigator.serviceWorker.ready;
             } else {
                 return null;
             }
@@ -142,6 +185,10 @@ export const requestForToken = async () => {
             vapidKey: VAPID_KEY,
             serviceWorkerRegistration: registration
         });
+
+        if (currentToken) {
+            console.log('✅ FCM Token generated successfully:', currentToken.substring(0, 10) + '...');
+        }
 
         return currentToken || null;
 

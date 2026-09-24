@@ -8,7 +8,7 @@ import { setUser } from '../../store/slices/userSlice';
 import { authService } from '../../services';
 import toastUtils from '../../config/toast';
 import { theme } from '../../theme/theme.constants';
-import { isMobileApp } from '../../services/firebase';
+import { isMobileApp, requestForToken } from '../../services/firebase';
 
 /**
  * VerifyOTPPage Component
@@ -73,11 +73,12 @@ const VerifyOTPPage = () => {
 
     try {
       // Call verify OTP API
+      const resolvedToken = fcmToken || (await requestForToken());
       const response = await authService.verifyOTP({
         email: email || (emailOrPhone?.includes('@') ? emailOrPhone : undefined),
         phone: phone || (!emailOrPhone?.includes('@') ? emailOrPhone?.replace(/\D/g, '') : undefined),
         otp: otp,
-        fcmToken: fcmToken,
+        fcmToken: resolvedToken,
         platform: isMobileApp() ? 'mobile' : 'web'
       });
 
