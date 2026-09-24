@@ -164,8 +164,11 @@ const BottomNavbar = () => {
         }
       `}</style>
       <nav
-        className="fixed bottom-4 left-4 right-4 px-4 py-3.5 rounded-2xl flex items-center justify-around z-50 shadow-lg"
-        style={{ backgroundColor: colors.backgroundTertiary }}
+        className="fixed bottom-6 left-4 right-4 px-4 py-3.5 rounded-2xl flex items-center justify-around z-50 shadow-lg"
+        style={{
+          backgroundColor: colors.backgroundTertiary,
+          bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+        }}
       >
 
         {navItems.map((item) => {

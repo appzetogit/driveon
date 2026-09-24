@@ -330,7 +330,7 @@ const ModuleChangePasswordPage = () => {
 
       {/* Action Buttons */}
       {!isKeyboardVisible && (
-        <div className="fixed md:relative md:max-w-3xl md:mx-auto bottom-16 left-0 right-0 px-4 md:px-6 lg:px-8 xl:px-12 py-4 md:py-6 bg-white md:bg-transparent border-t md:border-t-0 z-40" style={{ borderColor: colors.borderMedium }}>
+        <div className="fixed md:relative md:max-w-3xl md:mx-auto bottom-[100px] md:bottom-auto left-0 right-0 px-4 md:px-6 lg:px-8 xl:px-12 py-4 md:py-6 bg-white md:bg-transparent border-t md:border-t-0 z-40" style={{ borderColor: colors.borderMedium }}>
           <div className="flex gap-3 md:gap-4">
             <button
               type="button"
