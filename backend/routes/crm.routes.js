@@ -40,6 +40,7 @@ import {
     createFastBooking,
     reportAccident,
     getAccidentCases,
+    getAccidentCaseById,
     updateAccidentCase,
     getAccidentSummary,
     getActiveBookingsDetails,
@@ -252,6 +253,7 @@ router.route('/accidents')
     .post(handleFileUpload('evidence', true), reportAccident);
 
 router.route('/accidents/:id')
+    .get(getAccidentCaseById)
     .put(updateAccidentCase);
 
 // Reports & Analytics Routes

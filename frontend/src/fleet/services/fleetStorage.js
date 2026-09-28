@@ -21,22 +21,10 @@ export const loadFleetState = () => {
   const parsed = safeParse(raw, null);
   if (!parsed || typeof parsed !== 'object') return getInitialState();
 
-  const storedCars = Array.isArray(parsed.cars) ? parsed.cars : null;
-  const seedById = new Map(seedFleetCars.map((c) => [c.id, c]));
-
-  // Backward-compatible migration:
-  // - merge new seed fields (e.g., ownerName/ownerPhone) into any cars already saved in localStorage
-  // - keep any user-stored overrides
-  // - keep any extra cars not present in seed
+  // Filter out any legacy mock cars starting with fleet_car_
   const cars = storedCars
-    ? [
-        ...storedCars.map((stored) => {
-          const seed = seedById.get(stored?.id);
-          return seed ? { ...seed, ...stored } : stored;
-        }),
-        ...seedFleetCars.filter((seed) => !storedCars.some((c) => c?.id === seed.id)),
-      ]
-    : seedFleetCars;
+    ? storedCars.filter(c => c && !String(c.id).startsWith('fleet_car_out_') && !String(c.id).startsWith('fleet_car_in_'))
+    : [];
 
   const bookings = Array.isArray(parsed.bookings) ? parsed.bookings : [];
   return { cars, bookings };

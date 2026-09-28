@@ -9,15 +9,9 @@ import useInViewAnimation from '../hooks/useInViewAnimation';
 import { bookingService } from '../../services/booking.service';
 import { carService } from '../../services/car.service';
 
-// Import car images for mock data
+// Import default car image placeholder for missing photos
 import carImg1 from '../../assets/car_img1-removebg-preview.png';
-import carImg2 from '../../assets/car_img2.png';
-import carImg4 from '../../assets/car_img4-removebg-preview.png';
-import carImg5 from '../../assets/car_img5-removebg-preview.png';
-import carImg6 from '../../assets/car_img6-removebg-preview.png';
-import carImg8 from '../../assets/car_img8.png';
 
-const carImages = [carImg1, carImg2, carImg4, carImg5, carImg6, carImg8];
 
 // Booking card shimmer skeleton loading component
 const BookingCardSkeleton = () => (
@@ -352,21 +346,8 @@ const BookingsPage = () => {
                 fuelType: cachedCar.fuelType || carData?.fuelType || 'Petrol',
               };
             } else if (carId && (!carData || !carData.seatingCapacity || !carData.transmission)) {
-              // Check if it's a mock car ID first
-              if (typeof carId === 'string' && carId.startsWith('car')) {
-                const carNumber = parseInt(carId.replace(/\D/g, '')) || 1;
-                carData = {
-                  id: carId,
-                  brand: ['Toyota', 'Honda', 'Maruti', 'Hyundai', 'Tata', 'Mahindra', 'Ford'][(carNumber - 1) % 7] || 'Car',
-                  model: ['Camry', 'City', 'Swift', 'i20', 'Nexon', 'XUV700', 'EcoSport'][(carNumber - 1) % 7] || 'Model',
-                  image: carImages[(carNumber - 1) % carImages.length] || carImg1,
-                  seats: 5,
-                  transmission: 'Manual',
-                  fuelType: 'Petrol',
-                };
-              } else {
-                // Fallback to fetch individually only if not found in map
-                try {
+              // Fallback to fetch individually only if not found in map
+              try {
                   const carResponse = await carService.getCarDetails(carId);
                   if (carResponse.success && carResponse.data?.car) {
                     const apiCar = carResponse.data.car;
@@ -433,7 +414,6 @@ const BookingsPage = () => {
                     };
                   }
                 }
-              }
             } else if (carData) {
               // Car is populated, ensure all required fields exist
               let carImage = carImg1;

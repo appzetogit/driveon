@@ -5,17 +5,9 @@ import { BOOKING_STATUS } from '../../constants';
 import { theme } from '../../theme/theme.constants';
 import bookingService from '../../services/booking.service';
 
-// Import car images from assets
-import carImg1 from '../../assets/car_img1-removebg-preview.png';
-import carImg2 from '../../assets/car_img2-removebg-preview.png';
-import carImg3 from '../../assets/car_img3-removebg-preview.png';
-import carImg4 from '../../assets/car_img4-removebg-preview.png';
-import carImg5 from '../../assets/car_img5-removebg-preview.png';
-import carImg6 from '../../assets/car_img6-removebg-preview.png';
-import carImg7 from '../../assets/car_img7-removebg-preview.png';
+// Default placeholder for missing car images
+import defaultCarImg from '../../assets/car_img1-removebg-preview.png';
 
-// Array of car images for easy access
-const carImages = [carImg1, carImg2, carImg3, carImg4, carImg5, carImg6, carImg7];
 
 /**
  * BookingHistoryPage Component
@@ -40,11 +32,17 @@ const BookingHistoryPage = () => {
   const [loading, setLoading] = useState(allBookings.length === 0);
   const [error, setError] = useState(null);
 
-  // Get car image from assets based on car ID or index
-  const getCarImage = (carId) => {
-    // Use car ID to get a consistent image (modulo to cycle through available images)
-    const index = parseInt(carId.replace(/\D/g, '')) || 0;
-    return carImages[index % carImages.length];
+  // Get car image from assets or default
+  const getCarImage = (car) => {
+    if (!car) return defaultCarImg;
+    if (car.images && car.images.length > 0) {
+      const first = car.images[0];
+      return typeof first === 'string' ? first : (first?.url || first?.path || defaultCarImg);
+    }
+    if (car.image) {
+      return typeof car.image === 'string' ? car.image : (car.image?.url || defaultCarImg);
+    }
+    return defaultCarImg;
   };
 
   // Fetch all bookings from API (background sync on mount)
@@ -72,9 +70,7 @@ const BookingHistoryPage = () => {
                 id: carId,
                 brand: car.brand || 'Unknown',
                 model: car.model || 'Car',
-                image: car.images && car.images.length > 0 
-                  ? (typeof car.images[0] === 'string' ? car.images[0] : car.images[0].url || car.images[0].path)
-                  : getCarImage(carId),
+                image: getCarImage(car),
                 rating: car.averageRating || car.rating || 0,
               },
               pickupDate: booking.tripStart?.date || booking.pickupDate,

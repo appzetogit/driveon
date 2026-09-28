@@ -47,4 +47,7 @@ const notificationSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// TTL index: Automatically delete notification history older than 3 days (3 days = 3 * 24 * 60 * 60 = 259200 seconds)
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 259200 });
+
 export default mongoose.model('Notification', notificationSchema);

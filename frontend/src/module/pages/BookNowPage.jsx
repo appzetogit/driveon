@@ -15,12 +15,8 @@ import CustomSelect from "../components/common/CustomSelect";
 import { colors } from "../theme/colors";
 import { motion } from "framer-motion";
 
-// Import car images for mock data
-import carImg1 from "../../assets/car_img1-removebg-preview.png";
-import carImg4 from "../../assets/car_img4-removebg-preview.png";
-import carImg5 from "../../assets/car_img5-removebg-preview.png";
-import carImg6 from "../../assets/car_img6-removebg-preview.png";
-import carImg8 from "../../assets/car_img8.png";
+// Default car image placeholder for cars without images
+import defaultCarImg from "../../assets/car_img1-removebg-preview.png";
 
 /**
  * Helper function to extract numeric price from price string or number
@@ -77,8 +73,8 @@ const BookNowPage = () => {
           name: stateCar.name || `${stateCar.brand || ""} ${stateCar.model || ""}`.trim(),
           brand: stateCar.brand,
           model: stateCar.model,
-          image: stateCar.image || stateCar.images?.[0] || carImg1,
-          images: stateCar.images || [stateCar.image || carImg1],
+          image: stateCar.image || stateCar.images?.[0] || defaultCarImg,
+          images: stateCar.images || [stateCar.image || defaultCarImg],
           price: extractPrice(stateCar.price || stateCar.pricePerDay || 0),
           pricePerDay: extractPrice(stateCar.pricePerDay || stateCar.price || 0),
           seats: stateCar.seats || 4,
@@ -106,8 +102,8 @@ const BookNowPage = () => {
                 name: cached.name || `${cached.brand || ""} ${cached.model || ""}`.trim(),
                 brand: cached.brand,
                 model: cached.model,
-                image: cached.image || cached.images?.[0] || carImg1,
-                images: cached.images || [cached.image || carImg1],
+                image: cached.image || cached.images?.[0] || defaultCarImg,
+                images: cached.images || [cached.image || defaultCarImg],
                 price: extractPrice(cached.price || cached.pricePerDay || 0),
                 pricePerDay: extractPrice(cached.pricePerDay || cached.price || 0),
                 seats: cached.seats || 4,
@@ -137,11 +133,11 @@ const BookNowPage = () => {
             const apiCar = response.data.data.car;
             
             // Resolve primary image
-            let carImage = carImg1;
+            let carImage = defaultCarImg;
             let carImages = [];
             if (apiCar.images && Array.isArray(apiCar.images) && apiCar.images.length > 0) {
               const primary = apiCar.images.find(img => img.isPrimary);
-              const matchedUrl = primary ? (primary.url || primary.path) : (apiCar.images[0]?.url || apiCar.images[0]?.path || carImg1);
+              const matchedUrl = primary ? (primary.url || primary.path) : (apiCar.images[0]?.url || apiCar.images[0]?.path || defaultCarImg);
               carImage = matchedUrl.startsWith('http') ? matchedUrl : `${import.meta.env.VITE_API_BASE_URL || ''}${matchedUrl}`;
               carImages = apiCar.images.map(img => {
                 const url = typeof img === 'string' ? img : (img?.url || img?.path);
@@ -1052,8 +1048,8 @@ const BookNowPage = () => {
               brand: brand || car.brand,
               model: model || car.model,
               name: car.name || `${brand || car.brand} ${model || car.model}`,
-              image: car.image || car.images?.[0] || carImg1,
-              images: car.images || (car.image ? [car.image] : [carImg1]),
+              image: car.image || car.images?.[0] || defaultCarImg,
+              images: car.images || (car.image ? [car.image] : [defaultCarImg]),
               seats: car.seats || 4,
               seatingCapacity: car.seats || 4,
               transmission: car.transmission || "Automatic",

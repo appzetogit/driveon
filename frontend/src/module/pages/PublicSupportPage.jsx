@@ -1,42 +1,65 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   FiArrowLeft, FiHeadphones, FiMail, FiPhone,
   FiMessageCircle, FiFileText, FiShield, FiHelpCircle
 } from 'react-icons/fi';
+import api from '../../services/api';
+import { commonService } from '../../services/common.service';
 
 /**
  * PublicSupportPage
  * Public support page for User App - accessible without login.
- * Used for Play Store / App Store submission URL.
- * URL: /support
+ * Dynamic settings and live FAQs.
  */
 const PublicSupportPage = () => {
   const navigate = useNavigate();
+  const [settings, setSettings] = useState({
+    supportPhone: '+91 99939 11855',
+    supportEmail: 'support@driveon.in',
+    whatsappNumber: '919993911855',
+  });
+  const [faqs, setFaqs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const faqs = [
-    {
-      q: 'How do I book a car?',
-      a: 'Search for available cars, select your preferred vehicle, choose dates, complete KYC, and confirm booking.'
-    },
-    {
-      q: 'What documents are required for KYC?',
-      a: 'You need Aadhaar card, PAN card, and a valid Driving License for KYC verification.'
-    },
-    {
-      q: 'How do I cancel a booking?',
-      a: 'Go to My Bookings, select the booking, and tap Cancel. Cancellation policies apply based on timing.'
-    },
-    {
-      q: 'How are refunds processed?',
-      a: 'Refunds are processed to the original payment method within 5-7 business days after cancellation approval.'
-    },
-    {
-      q: 'What if I face an issue during my trip?',
-      a: 'Call our 24/7 emergency helpline immediately. Our team will assist you with roadside assistance or vehicle replacement.'
-    },
-  ];
+  useEffect(() => {
+    const fetchSupportData = async () => {
+      setLoading(true);
+      try {
+        const [settingsRes, faqsRes] = await Promise.all([
+          api.get('/common/settings').catch(() => null),
+          commonService.getFAQs().catch(() => null)
+        ]);
+
+        if (settingsRes?.data?.settings) {
+          const s = settingsRes.data.settings;
+          setSettings({
+            supportPhone: s.supportPhone || s.emergencyPhone || s.phone || '+91 99939 11855',
+            supportEmail: s.supportEmail || s.email || 'support@driveon.in',
+            whatsappNumber: s.whatsappNumber || (s.supportPhone ? s.supportPhone.replace(/\D/g, '') : '919993911855'),
+          });
+        }
+
+        if (faqsRes?.data?.faqs && Array.isArray(faqsRes.data.faqs)) {
+          setFaqs(faqsRes.data.faqs.map(f => ({ q: f.question, a: f.answer })));
+        } else if (Array.isArray(faqsRes?.faqs)) {
+          setFaqs(faqsRes.faqs.map(f => ({ q: f.question, a: f.answer })));
+        } else {
+          setFaqs([]);
+        }
+      } catch (error) {
+        console.error('Error fetching support data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSupportData();
+  }, []);
+
+  const cleanPhone = settings.supportPhone.replace(/\s+/g, '');
+  const cleanWhatsapp = settings.whatsappNumber.replace(/\D/g, '');
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] font-sans flex flex-col" style={{ minHeight: '100dvh' }}>
@@ -76,18 +99,18 @@ const PublicSupportPage = () => {
           <div className="space-y-3">
             <SupportCard
               icon={<FiPhone size={22} className="text-red-500" />}
-              title="24/7 Emergency Helpline"
-              desc="For urgent issues during your trip"
+              title="24/7 Helpline"
+              desc={settings.supportPhone}
               action="Call Now"
-              link="tel:+918000000000"
+              link={`tel:${cleanPhone}`}
               actionColor="bg-red-500"
             />
             <SupportCard
               icon={<FiMail size={22} className="text-blue-500" />}
               title="Email Support"
-              desc="support@driveoncar.co.in"
+              desc={settings.supportEmail}
               action="Send Email"
-              link="mailto:support@driveoncar.co.in"
+              link={`mailto:${settings.supportEmail}`}
               actionColor="bg-blue-600"
             />
             <SupportCard
@@ -95,7 +118,7 @@ const PublicSupportPage = () => {
               title="WhatsApp Support"
               desc="Chat with our support team"
               action="WhatsApp"
-              link="https://wa.me/918000000000"
+              link={`https://wa.me/${cleanWhatsapp}`}
               actionColor="bg-green-500"
             />
           </div>
@@ -114,18 +137,24 @@ const PublicSupportPage = () => {
             </div>
             <h3 className="font-bold text-lg">Frequently Asked Questions</h3>
           </div>
-          <div className="space-y-3">
-            {faqs.map((faq, i) => (
-              <FAQItem key={i} question={faq.q} answer={faq.a} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="py-6 text-center text-gray-400 text-sm">Loading FAQs...</div>
+          ) : faqs.length === 0 ? (
+            <div className="py-6 text-center text-gray-400 text-sm">No FAQs available right now.</div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {faqs.map((faq, i) => (
+                <FaqItem key={i} question={faq.q} answer={faq.a} />
+              ))}
+            </div>
+          )}
         </motion.div>
 
-        {/* Legal Links */}
+        {/* Policy Links */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
+          transition={{ delay: 0.2 }}
           className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100"
         >
           <div className="flex items-center gap-2 mb-4 text-[#1C205C]">
@@ -134,94 +163,90 @@ const PublicSupportPage = () => {
             </div>
             <h3 className="font-bold text-lg">Legal & Policies</h3>
           </div>
-          <div className="space-y-1">
-            <LegalLink label="Privacy Policy" to="/privacy-policy" navigate={navigate} />
-            <LegalLink label="Terms & Conditions" to="/terms" navigate={navigate} />
-            <LegalLink label="About DriveOn" to="/about" navigate={navigate} />
+          <div className="space-y-2">
+            <PolicyLink
+              title="Privacy Policy"
+              desc="How we handle and protect your personal data"
+              icon={<FiShield className="text-blue-500" />}
+              onClick={() => navigate('/privacy-policy')}
+            />
+            <PolicyLink
+              title="Terms & Conditions"
+              desc="Rules and guidelines for using DriveOn"
+              icon={<FiFileText className="text-purple-500" />}
+              onClick={() => navigate('/terms')}
+            />
           </div>
         </motion.div>
 
-        {/* Login CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-[#1C205C] p-5 rounded-3xl shadow-lg"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white">
-              <FiShield size={16} />
-            </div>
-            <h3 className="font-bold text-white">Raise a Support Ticket</h3>
-          </div>
-          <p className="text-white/70 text-sm mb-4">
-            Login to create a support ticket and track your issue status with a unique token.
-          </p>
-          <button
-            onClick={() => navigate('/login')}
-            className="w-full bg-white text-[#1C205C] font-bold py-3 rounded-2xl text-sm hover:bg-gray-100 transition-colors active:scale-[0.98]"
-          >
-            Login to Create Ticket
-          </button>
-        </motion.div>
+        {/* App Version / Footer */}
+        <div className="text-center pt-4 pb-2">
+          <p className="text-xs text-gray-400 font-medium">DriveOn Mobility • Version 1.0.0</p>
+          <p className="text-[11px] text-gray-300 mt-1">Regulated under Motor Vehicles Act, 1988</p>
+        </div>
 
-        <p className="text-center text-xs text-gray-400 pt-2">
-          DriveOn Car Rentals · support@driveoncar.co.in
-        </p>
       </div>
     </div>
   );
 };
 
 const SupportCard = ({ icon, title, desc, action, link, actionColor }) => (
-  <div className="flex items-center p-3.5 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors">
-    <div className="w-11 h-11 rounded-xl bg-white flex items-center justify-center shadow-sm flex-shrink-0">
-      {icon}
-    </div>
-    <div className="ml-3 flex-1">
-      <h4 className="font-bold text-[#1C205C] text-sm">{title}</h4>
-      <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+    <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-xs">
+        {icon}
+      </div>
+      <div>
+        <p className="font-bold text-sm text-[#1C205C]">{title}</p>
+        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+      </div>
     </div>
     <a
       href={link}
-      target="_blank"
+      target={link.startsWith('http') ? '_blank' : '_self'}
       rel="noopener noreferrer"
-      className={`ml-2 px-3 py-1.5 text-white text-xs font-bold rounded-xl ${actionColor} hover:opacity-90 transition-opacity`}
+      className={`${actionColor} text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs hover:opacity-90 active:scale-95 transition-all`}
     >
       {action}
     </a>
   </div>
 );
 
-const FAQItem = ({ question, answer }) => {
-  const [open, setOpen] = React.useState(false);
+const FaqItem = ({ question, answer }) => {
+  const [open, setOpen] = useState(false);
   return (
-    <div
-      className="bg-gray-50 rounded-2xl overflow-hidden cursor-pointer"
-      onClick={() => setOpen(!open)}
-    >
-      <div className="flex items-center justify-between p-3.5">
-        <p className="font-semibold text-[#1C205C] text-sm flex-1 pr-3">{question}</p>
-        <span className={`text-gray-400 text-lg transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
-          ↓
-        </span>
-      </div>
+    <div className="py-3">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full text-left flex items-center justify-between gap-3 text-sm font-semibold text-[#1C205C]"
+      >
+        <span>{question}</span>
+        <span className="text-gray-400 text-xs">{open ? '▲' : '▼'}</span>
+      </button>
       {open && (
-        <div className="px-3.5 pb-3.5">
-          <p className="text-xs text-gray-600 leading-relaxed">{answer}</p>
-        </div>
+        <p className="text-xs text-gray-600 mt-2 leading-relaxed pl-1 border-l-2 border-blue-500">
+          {answer}
+        </p>
       )}
     </div>
   );
 };
 
-const LegalLink = ({ label, to, navigate }) => (
+const PolicyLink = ({ title, desc, icon, onClick }) => (
   <button
-    onClick={() => navigate(to)}
-    className="w-full flex items-center justify-between py-3 px-3 rounded-xl hover:bg-gray-50 transition-colors text-left group"
+    onClick={onClick}
+    className="w-full text-left p-3.5 rounded-2xl bg-gray-50/80 border border-gray-100 flex items-center justify-between hover:bg-gray-100/80 transition-colors"
   >
-    <span className="font-bold text-gray-600 text-sm group-hover:text-[#1C205C] transition-colors">{label}</span>
-    <span className="text-gray-300 group-hover:text-blue-500 transition-colors">↗</span>
+    <div className="flex items-center gap-3">
+      <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-xs">
+        {icon}
+      </div>
+      <div>
+        <p className="font-bold text-sm text-[#1C205C]">{title}</p>
+        <p className="text-[11px] text-gray-400 mt-0.5">{desc}</p>
+      </div>
+    </div>
+    <span className="text-gray-400 text-sm font-bold">›</span>
   </button>
 );
 

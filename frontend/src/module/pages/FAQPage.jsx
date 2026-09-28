@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { colors } from '../theme/colors';
 import { useAppSelector } from '../../hooks/redux';
 import { commonService } from '../../services/common.service';
-import carImg1 from '../../assets/car_img1-removebg-preview.png';
+
 
 /**
  * FAQPage Component
@@ -26,48 +26,17 @@ const FAQPage = () => {
       try {
         setLoading(true);
         const response = await commonService.getFAQs();
-        if (response.success && response.data?.faqs?.length > 0) {
+        if (response.success && response.data?.faqs && Array.isArray(response.data.faqs)) {
           setFaqs(response.data.faqs);
+        } else if (Array.isArray(response.faqs)) {
+          setFaqs(response.faqs);
+        } else if (Array.isArray(response.data)) {
+          setFaqs(response.data);
         } else {
-          // Fallback: Use static FAQs if API fails
-          setFaqs([
-            {
-              question: "How do I complete my profile?",
-              answer: "To book a car, you need to complete 100% of your profile. This includes: Name, Email, Phone Number, Age, Gender, Address, Profile Photo, and KYC verification through DigiLocker. You must verify your Aadhaar, PAN, and Driving License documents via DigiLocker OAuth2 integration. Booking is not allowed until your profile is 100% complete."
-            },
-            {
-              question: "What is KYC verification and how does it work?",
-              answer: "KYC (Know Your Customer) verification is done through DigiLocker integration. When you click 'Verify Documents', you'll be redirected to DigiLocker where you approve access. Our backend then fetches your verified Aadhaar, PAN, and Driving License documents. These verified document references are stored securely, and your KYC status is marked as verified. This ensures maximum security and trust for both renters and car owners."
-            },
-            {
-              question: "Do I need a guarantor? How does the guarantor system work?",
-              answer: "Yes, you need to add a guarantor who must also complete registration and KYC verification. Here's how it works: You enter your guarantor's phone number or email. The guarantor receives an invite link, installs the app, completes registration and KYC verification. Once verified, the guarantor is linked to your account in the database. Booking is not allowed until your guarantor is verified. This adds an extra layer of security and trust."
-            },
-            {
-              question: "What payment options are available?",
-              answer: "We offer flexible payment options to suit your needs. You can choose between Full Payment or 20% Advance Payment. Payments are processed securely through Razorpay and Stripe. If you choose the 20% advance option, the remaining amount is automatically debited. We also handle security deposit management seamlessly."
-            },
-            {
-              question: "Is live GPS tracking mandatory?",
-              answer: "Yes, live GPS tracking is mandatory during active trips for safety and security. When your trip starts, GPS tracking is automatically enabled. The mobile app runs a background service that sends location data to the backend every 10 seconds. This provides real-time location updates for both renters and car owners. Location data is stored for 6 months for dispute resolution purposes."
-            },
-            {
-              question: "How does the referral program work?",
-              answer: "Every user gets a unique referral code. When a new user signs up using your referral code, you earn points. When that new user completes their first trip, you get an extra reward. Your referral points are visible in your profile and can be used as discounts on your bookings. It's a great way to earn rewards while helping others discover DriveOn."
-            },
-            {
-              question: "How does dynamic pricing work?",
-              answer: "Our pricing engine calculates prices dynamically based on several factors: date of booking (weekday/weekend), time of booking (peak hours), duration, seasonal surge, car demand, last available units, and festive days. The system includes weekend multipliers, holiday multipliers, time of day multipliers, peak demand surcharges, and duration-based pricing. This ensures fair and transparent pricing that adjusts to market conditions."
-            },
-            {
-              question: "How do I book a car?",
-              answer: "First, ensure your profile is 100% complete and your guarantor is verified. Then browse and filter our car collection based on your preferences (brand, model, price, location, etc.). Select your preferred car and view detailed information. Choose your pickup and drop-off dates and times. The system will calculate the dynamic price. Select your payment option (Full or 20% advance) and complete the secure payment. Once payment is confirmed, your booking is complete. GPS tracking will automatically start when your trip begins."
-            }
-          ]);
+          setFaqs([]);
         }
       } catch (error) {
         console.error('Error fetching FAQs:', error);
-        // Keep empty array on error
         setFaqs([]);
       } finally {
         setLoading(false);
@@ -135,19 +104,15 @@ const FAQPage = () => {
                   className="relative flex items-center justify-center w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14"
                 >
                   {/* Circular profile icon with white border */}
-                  <div className="w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-full border-2 border-white flex items-center justify-center overflow-hidden bg-gray-800">
-                    {user?.profilePhoto ? (
+                  <div className="w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-full border-2 border-white flex items-center justify-center overflow-hidden bg-indigo-600 text-white font-bold text-sm">
+                    {user?.profilePhoto || user?.avatar ? (
                       <img
-                        src={user.profilePhoto}
+                        src={user.profilePhoto || user.avatar}
                         alt="Profile"
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
-                      <img
-                        src={carImg1}
-                        alt="Profile"
-                        className="w-full h-full rounded-full object-cover"
-                      />
+                      <span>{user?.name ? user.name.charAt(0).toUpperCase() : 'U'}</span>
                     )}
                   </div>
                 </Link>

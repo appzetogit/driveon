@@ -8,9 +8,9 @@ import toastUtils from '../../../config/toast';
 const AdminNotificationsPage = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('send'); // 'send' or 'history'
-  
+
   // State for Role Notification Form
-  const [roles, setRoles] = useState(['Customer', 'Driver', 'Telecaller', 'Manager']);
+  const [roles, setRoles] = useState(['Customer', 'Driver', 'Telecaller']);
   const [selectedRole, setSelectedRole] = useState('Customer');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -42,13 +42,13 @@ const AdminNotificationsPage = () => {
       if (response.success && response.data?.roles) {
         // If roles exist, merge and make unique
         const dbRoles = response.data.roles;
-        const combinedRoles = [...new Set(['Customer', ...dbRoles, 'Driver', 'Telecaller', 'Manager'])];
+        const combinedRoles = [...new Set(['Customer', ...dbRoles, 'Driver', 'Telecaller'])];
         setRoles(combinedRoles);
         if (combinedRoles.length > 0 && !selectedRole) {
           setSelectedRole(combinedRoles[0]);
         }
       } else {
-        const defaultRoles = ['Customer', 'Driver', 'Telecaller', 'Manager'];
+        const defaultRoles = ['Customer', 'Driver', 'Telecaller'];
         setRoles(defaultRoles);
         if (!selectedRole && defaultRoles.length > 0) {
           setSelectedRole(defaultRoles[0]);
@@ -56,7 +56,7 @@ const AdminNotificationsPage = () => {
       }
     } catch (error) {
       console.error('Failed to fetch staff roles:', error);
-      const defaultRoles = ['Customer', 'Driver', 'Telecaller', 'Manager'];
+      const defaultRoles = ['Customer', 'Driver', 'Telecaller'];
       setRoles(defaultRoles);
       if (!selectedRole && defaultRoles.length > 0) {
         setSelectedRole(defaultRoles[0]);
@@ -170,12 +170,12 @@ const AdminNotificationsPage = () => {
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen"
       style={{ backgroundColor: colors.backgroundPrimary }}
     >
       <div className="max-w-6xl mx-auto px-4 pt-20 md:pt-6 pb-6 md:px-6 lg:px-8">
-        
+
         {/* Header */}
         <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -206,11 +206,10 @@ const AdminNotificationsPage = () => {
         <div className="flex border-b mb-6" style={{ borderColor: colors.borderMedium }}>
           <button
             onClick={() => setActiveTab('send')}
-            className={`px-6 py-3 font-semibold transition-all relative ${
-              activeTab === 'send' 
-                ? 'text-white border-b-2' 
+            className={`px-6 py-3 font-semibold transition-all relative ${activeTab === 'send'
+                ? 'text-white border-b-2'
                 : 'text-gray-400 hover:text-white'
-            }`}
+              }`}
             style={{
               borderColor: activeTab === 'send' ? colors.backgroundTertiary : 'transparent',
               color: activeTab === 'send' ? colors.backgroundTertiary : undefined
@@ -220,11 +219,10 @@ const AdminNotificationsPage = () => {
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`px-6 py-3 font-semibold transition-all relative ${
-              activeTab === 'history' 
-                ? 'text-white border-b-2' 
+            className={`px-6 py-3 font-semibold transition-all relative ${activeTab === 'history'
+                ? 'text-white border-b-2'
                 : 'text-gray-400 hover:text-white'
-            }`}
+              }`}
             style={{
               borderColor: activeTab === 'history' ? colors.backgroundTertiary : 'transparent',
               color: activeTab === 'history' ? colors.backgroundTertiary : undefined
@@ -237,14 +235,14 @@ const AdminNotificationsPage = () => {
         {/* Tab Content */}
         {activeTab === 'send' ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
+
             {/* Main Form */}
             <Card className="p-6 lg:col-span-2">
               <h2 className="text-xl font-semibold mb-6" style={{ color: colors.textPrimary }}>
                 Compose Notification Broadcast
               </h2>
               <form onSubmit={handleSendNotification} className="space-y-6">
-                
+
                 {/* Role Selector */}
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: colors.textPrimary }}>
@@ -342,14 +340,14 @@ const AdminNotificationsPage = () => {
                 <h3 className="text-lg font-semibold mb-4" style={{ color: colors.textPrimary }}>
                   Image Attachment (Optional)
                 </h3>
-                
+
                 {/* Drag and Drop Box */}
                 {!imagePreview ? (
                   <div
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                     className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all min-h-[220px]"
-                    style={{ 
+                    style={{
                       borderColor: colors.borderMedium,
                       backgroundColor: colors.backgroundSecondary
                     }}
@@ -373,9 +371,9 @@ const AdminNotificationsPage = () => {
                   </div>
                 ) : (
                   <div className="relative rounded-lg overflow-hidden border" style={{ borderColor: colors.borderMedium }}>
-                    <img 
-                      src={imagePreview} 
-                      alt="Selected upload preview" 
+                    <img
+                      src={imagePreview}
+                      alt="Selected upload preview"
                       className="w-full h-auto max-h-[300px] object-contain bg-black/10"
                     />
                     <button
@@ -400,14 +398,30 @@ const AdminNotificationsPage = () => {
             </Card>
           </div>
         ) : (
-          
+
           /* History Logs Table */
           <Card className="p-6 overflow-hidden">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold" style={{ color: colors.textPrimary }}>
-                Broadcast Logs ({totalNotifications})
-              </h2>
-              <button 
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold" style={{ color: colors.textPrimary }}>
+                  Broadcast Logs ({totalNotifications})
+                </h2>
+                <span
+                  className="text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5"
+                  style={{
+                    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                    color: '#60a5fa',
+                    border: '1px solid rgba(59, 130, 246, 0.25)'
+                  }}
+                  title="Notifications are automatically removed after 3 days via MongoDB TTL"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Auto-deletes after 3 days (TTL)
+                </span>
+              </div>
+              <button
                 onClick={() => fetchHistory(1)}
                 className="p-2 bg-gray-100/5 hover:bg-gray-100/15 border border-gray-100/10 rounded-lg text-sm transition-all"
                 title="Refresh history logs"
@@ -429,7 +443,7 @@ const AdminNotificationsPage = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
                 <p className="text-lg font-semibold" style={{ color: colors.textPrimary }}>No broadcast logs found</p>
-                <p className="text-sm text-gray-400 mt-1">Start by sending your first notification from the compose tab</p>
+                <p className="text-sm text-gray-400 mt-1">Logs are automatically retained for 3 days before being cleared</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -446,17 +460,17 @@ const AdminNotificationsPage = () => {
                   </thead>
                   <tbody>
                     {history.map((notif) => (
-                      <tr 
-                        key={notif.id} 
+                      <tr
+                        key={notif.id}
                         className="border-b hover:bg-white/5 transition-colors"
                         style={{ borderBottomColor: colors.borderMedium }}
                       >
                         <td className="py-4 px-4 text-sm font-medium">
-                          <span 
+                          <span
                             className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                            style={{ 
+                            style={{
                               backgroundColor: colors.backgroundLight,
-                              color: colors.textPrimary 
+                              color: colors.textPrimary
                             }}
                           >
                             {notif.recipient?.role || 'Staff'}
@@ -534,18 +548,17 @@ const AdminNotificationsPage = () => {
                             <button
                               key={p}
                               onClick={() => fetchHistory(p)}
-                              className={`px-3 py-1.5 text-sm border rounded-lg transition-all font-semibold ${
-                                page === p
+                              className={`px-3 py-1.5 text-sm border rounded-lg transition-all font-semibold ${page === p
                                   ? 'text-white border-transparent font-bold shadow-md shadow-indigo-900/10'
                                   : 'text-gray-400 border-gray-100/10 hover:bg-gray-100/10 hover:text-white'
-                              }`}
+                                }`}
                               style={page === p ? { backgroundColor: colors.backgroundTertiary } : {}}
                             >
                               {p}
                             </button>
                           );
                         }
-                        
+
                         // Show ellipsis if there's a gap
                         if (
                           (p === 2 && page > 3) ||
@@ -557,7 +570,7 @@ const AdminNotificationsPage = () => {
                             </span>
                           );
                         }
-                        
+
                         return null;
                       })}
 
@@ -584,14 +597,14 @@ const AdminNotificationsPage = () => {
 
       {/* Lightbox / Modal View */}
       {lightboxImage && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
           onClick={() => setLightboxImage(null)}
         >
           <div className="relative max-w-4xl max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <img 
-              src={lightboxImage} 
-              alt="Notification attachment lightbox preview" 
+            <img
+              src={lightboxImage}
+              alt="Notification attachment lightbox preview"
               className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl mx-auto"
             />
             <button

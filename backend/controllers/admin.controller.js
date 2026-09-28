@@ -2209,12 +2209,16 @@ export const getSentNotifications = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
+    // Filter history to last 3 days (in alignment with 3-day TTL retention)
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
     const matchQuery = {
       $or: [
         { type: 'broadcast' },
         { type: 'info', relatedId: null }
       ],
-      recipientModel: { $in: ['Staff', 'User'] }
+      recipientModel: { $in: ['Staff', 'User'] },
+      createdAt: { $gte: threeDaysAgo }
     };
 
     const pipeline = [

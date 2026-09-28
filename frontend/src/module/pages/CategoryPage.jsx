@@ -6,16 +6,8 @@ import CarCard from "../components/common/CarCard";
 import { colors } from "../theme/colors";
 import { carService } from "../../services/car.service";
 
-// Import car images for fallback
-import carImg1 from "../../assets/car_banImg1.jpg";
-import carImg2 from "../../assets/car_banImg2.jpg";
-import carImg3 from "../../assets/car_banImg3.jpg";
-import carImg4 from "../../assets/car_banImg4.jpg";
-import carImg5 from "../../assets/car_banImg5.jpg";
-import carImg6 from "../../assets/car_img6-removebg-preview.png";
-import nearbyImg1 from "../../assets/car_img8.png";
-import nearbyImg2 from "../../assets/car_img4-removebg-preview.png";
-import nearbyImg3 from "../../assets/car_img5-removebg-preview.png";
+// Default placeholder for cars without images
+import defaultCarImg from "../../assets/car_img1-removebg-preview.png";
 
 /**
  * CategoryPage Component
@@ -29,13 +21,10 @@ const CategoryPage = () => {
   const [category, setCategory] = useState({ label: categoryName || "Cars", count: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fallback images array
-  const fallbackImages = [carImg1, carImg2, carImg3, carImg4, carImg5, carImg6, nearbyImg1, nearbyImg2, nearbyImg3];
-
   // Transform car data from API to component format
-  const transformCarData = (car, index = 0) => {
+  const transformCarData = (car) => {
     // Get car image - prioritize API images
-    let carImage = fallbackImages[index % fallbackImages.length];
+    let carImage = defaultCarImg;
     
     if (car.images && Array.isArray(car.images) && car.images.length > 0) {
       // Find primary image or use first image

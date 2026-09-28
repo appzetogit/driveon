@@ -3,6 +3,7 @@ import Car from '../models/Car.js';
 import User from '../models/User.js';
 import Booking from '../models/Booking.js';
 import OutwardBooking from '../models/OutwardBooking.js';
+import { apiCache } from '../utils/cache.js';
 
 let lastOutwardSyncTime = 0;
 
@@ -122,6 +123,13 @@ export const getAllCars = async (req, res) => {
       availabilityEnd,
     } = req.query;
 
+    // Fast Cache Check
+    const cacheKey = `cars_list_${JSON.stringify(req.query)}`;
+    const cachedResponse = apiCache.get(cacheKey);
+    if (cachedResponse) {
+      return res.status(200).json(cachedResponse);
+    }
+
     // Build query
     const query = {
       status: 'active', // Public can only see active cars
@@ -133,25 +141,22 @@ export const getAllCars = async (req, res) => {
       const currentDate = new Date();
       const currentDateISO = currentDate.toISOString();
 
-      // 1. Conflicting normal bookings
-      const currentConflictingBookings = await Booking.find({
-        status: { $in: ['pending', 'confirmed', 'active'] },
-        tripStatus: { $nin: ['completed', 'cancelled'] },
-        $or: [
-          {
-            'tripStart.date': { $lte: currentDate },
-            'tripEnd.date': { $gte: currentDate },
-          }
-        ],
-      }).select('car');
-      const currentExcludedIds = currentConflictingBookings.map(b => b.car).filter(Boolean);
+      // Parallelize checking active bookings & outward bookings
+      const [currentConflictingBookings, currentConflictingOutward] = await Promise.all([
+        Booking.find({
+          status: { $in: ['pending', 'confirmed', 'active'] },
+          tripStatus: { $nin: ['completed', 'cancelled'] },
+          'tripStart.date': { $lte: currentDate },
+          'tripEnd.date': { $gte: currentDate },
+        }).select('car').lean(),
+        OutwardBooking.find({
+          status: 'active',
+          fromDate: { $lte: currentDateISO },
+          toDate: { $gte: currentDateISO }
+        }).select('carId').lean()
+      ]);
 
-      // 2. Conflicting inward/outward bookings
-      const currentConflictingOutward = await OutwardBooking.find({
-        status: 'active',
-        fromDate: { $lte: currentDateISO },
-        toDate: { $gte: currentDateISO }
-      }).select('carId');
+      const currentExcludedIds = currentConflictingBookings.map(b => b.car).filter(Boolean);
       const currentOutwardCarIds = currentConflictingOutward.map(b => b.carId).filter(Boolean);
 
       let currentOutwardExcludedIds = [];
@@ -161,7 +166,7 @@ export const getAllCars = async (req, res) => {
             { outwardCarId: { $in: currentOutwardCarIds } },
             { _id: { $in: currentOutwardCarIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id)) } }
           ]
-        }).select('_id');
+        }).select('_id').lean();
         currentOutwardExcludedIds = matchedCars.map(c => c._id);
       }
 
@@ -188,24 +193,24 @@ export const getAllCars = async (req, res) => {
         const searchStartISO = searchStart.toISOString();
         const searchEndISO = searchEnd.toISOString();
 
-        // 1. Find normal bookings that overlap with requested dates
-        const conflictingBookings = await Booking.find({
-          status: { $in: ['pending', 'confirmed', 'active'] },
-          $or: [
-            {
-              'tripStart.date': { $lte: searchEnd },
-              'tripEnd.date': { $gte: searchStart },
-            }
-          ],
-        }).select('car');
+        // 1 & 2. Find normal bookings and outward bookings in parallel
+        const [conflictingBookings, conflictingOutwardBookings] = await Promise.all([
+          Booking.find({
+            status: { $in: ['pending', 'confirmed', 'active'] },
+            $or: [
+              {
+                'tripStart.date': { $lte: searchEnd },
+                'tripEnd.date': { $gte: searchStart },
+              }
+            ],
+          }).select('car').lean(),
+          OutwardBooking.find({
+            status: 'active',
+            fromDate: { $lte: searchEndISO },
+            toDate: { $gte: searchStartISO }
+          }).select('carId').lean()
+        ]);
         const excludedCarIds = conflictingBookings.map(b => b.car).filter(Boolean);
-
-        // 2. Find inward/outward bookings that overlap with requested dates
-        const conflictingOutwardBookings = await OutwardBooking.find({
-          status: 'active',
-          fromDate: { $lte: searchEndISO },
-          toDate: { $gte: searchStartISO }
-        }).select('carId');
         const outwardCarIds = conflictingOutwardBookings.map(b => b.carId).filter(Boolean);
 
         let outwardExcludedCarIds = [];
@@ -215,7 +220,7 @@ export const getAllCars = async (req, res) => {
               { outwardCarId: { $in: outwardCarIds } },
               { _id: { $in: outwardCarIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id)) } }
             ]
-          }).select('_id');
+          }).select('_id').lean();
           outwardExcludedCarIds = matchedCars.map(c => c._id);
         }
 
@@ -289,18 +294,19 @@ export const getAllCars = async (req, res) => {
     const sortOptions = {};
     sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-    // Get cars with pagination
-    const cars = await Car.find(query)
-      .populate('owner', 'name email phone profilePhoto')
-      .select('-rejectionReason -approvedBy')
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(parseInt(limit));
+    // Get cars with pagination and total count in parallel using .lean() for blazing speed
+    const [cars, total] = await Promise.all([
+      Car.find(query)
+        .populate('owner', 'name email phone profilePhoto')
+        .select('-rejectionReason -approvedBy')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Car.countDocuments(query),
+    ]);
 
-    // Get total count
-    const total = await Car.countDocuments(query);
-
-    res.status(200).json({
+    const responseData = {
       success: true,
       data: {
         cars,
@@ -311,7 +317,12 @@ export const getAllCars = async (req, res) => {
           pages: Math.ceil(total / parseInt(limit)),
         },
       },
-    });
+    };
+
+    // Cache query results for 60 seconds
+    apiCache.set(cacheKey, responseData, 60);
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('Get all cars error:', error);
     res.status(500).json({
@@ -448,6 +459,11 @@ export const getCarById = async (req, res) => {
 export const getTopBrands = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
+    const cacheKey = `top_brands_${limit}`;
+    const cached = apiCache.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
 
     // Get brands with most active cars
     const brands = await Car.aggregate([
@@ -482,10 +498,13 @@ export const getTopBrands = async (req, res) => {
       },
     ]);
 
-    res.status(200).json({
+    const responseData = {
       success: true,
       data: { brands },
-    });
+    };
+    apiCache.set(cacheKey, responseData, 300);
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('Get top brands error:', error);
     res.status(500).json({
@@ -504,6 +523,11 @@ export const getTopBrands = async (req, res) => {
 export const getTopCarTypes = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
+    const cacheKey = `top_car_types_${limit}`;
+    const cached = apiCache.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
 
     // Get car types with most active cars and include a sample car for each type
     const carTypes = await Car.aggregate([
@@ -560,10 +584,13 @@ export const getTopCarTypes = async (req, res) => {
       },
     ]);
 
-    res.status(200).json({
+    const responseData = {
       success: true,
       data: { carTypes },
-    });
+    };
+    apiCache.set(cacheKey, responseData, 300);
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('Get top car types error:', error);
     res.status(500).json({
@@ -589,6 +616,12 @@ export const getNearbyCars = async (req, res) => {
       longitude,
     } = req.query;
 
+    const cacheKey = `nearby_cars_${city || ''}_${limit}_${latitude || ''}_${longitude || ''}`;
+    const cached = apiCache.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
     let query = {
       status: 'active',
       isAvailable: true,
@@ -599,33 +632,37 @@ export const getNearbyCars = async (req, res) => {
       query['location.city'] = { $regex: city, $options: 'i' };
     }
 
-    // Get cars
+    // Get cars with lean query for fast performance
     let cars = await Car.find(query)
       .populate('owner', 'name email phone profilePhoto')
       .select('-rejectionReason -approvedBy')
       .sort({ isFeatured: -1, averageRating: -1, createdAt: -1 })
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean();
 
     // If coordinates provided, sort by distance (simplified - can use geospatial queries for better accuracy)
     if (latitude && longitude) {
       cars = cars.map(car => {
-        if (car.location.coordinates?.latitude && car.location.coordinates?.longitude) {
+        if (car.location?.coordinates?.latitude && car.location?.coordinates?.longitude) {
           const distance = calculateDistance(
             parseFloat(latitude),
             parseFloat(longitude),
             car.location.coordinates.latitude,
             car.location.coordinates.longitude
           );
-          return { ...car.toObject(), distance };
+          return { ...car, distance };
         }
-        return car.toObject();
+        return car;
       }).sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
     }
 
-    res.status(200).json({
+    const responseData = {
       success: true,
       data: { cars },
-    });
+    };
+    apiCache.set(cacheKey, responseData, 60);
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('Get nearby cars error:', error);
     res.status(500).json({

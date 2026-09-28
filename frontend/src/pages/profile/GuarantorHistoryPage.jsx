@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../hooks/redux';
 import { theme } from '../../theme/theme.constants';
+import { userService } from '../../services/user.service';
 
 /**
  * GuarantorHistoryPage Component
@@ -12,47 +13,83 @@ const GuarantorHistoryPage = () => {
   const navigate = useNavigate();
   const { guarantor } = useAppSelector((state) => state.user);
 
-  // Mock guarantor history data - Replace with actual API call later
-  const mockGuarantorHistory = [
-    {
-      id: '1',
-      name: 'Rajesh Kumar',
-      phone: '+91 9876543210',
-      email: 'rajesh.kumar@example.com',
-      relationship: 'Friend',
-      status: 'verified',
-      addedDate: '2024-01-15',
-      verifiedDate: '2024-01-16',
-      removedDate: null,
-      bookingsCount: 5,
-    },
-    {
-      id: '2',
-      name: 'Priya Sharma',
-      phone: '+91 9876543211',
-      email: 'priya.sharma@example.com',
-      relationship: 'Family',
-      status: 'removed',
-      addedDate: '2023-12-10',
-      verifiedDate: '2023-12-12',
-      removedDate: '2024-01-10',
-      bookingsCount: 3,
-    },
-    {
-      id: '3',
-      name: 'Amit Patel',
-      phone: '+91 9876543212',
-      email: 'amit.patel@example.com',
-      relationship: 'Colleague',
-      status: 'pending',
-      addedDate: '2023-11-05',
-      verifiedDate: null,
-      removedDate: '2023-11-20',
-      bookingsCount: 0,
-    },
-  ];
+  const [guarantorHistory, setGuarantorHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [guarantorHistory] = useState(mockGuarantorHistory);
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoading(true);
+        const response = await userService.getMyGuarantorRequests();
+        const requestsData = response?.data?.requests || response?.requests || [];
+
+        const mapped = requestsData.map((req) => {
+          const person = req.user || req.requestedBy || {};
+          return {
+            id: req._id,
+            name: person.name || 'Guarantor',
+            phone: person.phone || '',
+            email: person.email || '',
+            relationship: req.relationship || 'Guarantor',
+            status: req.status === 'accepted' ? 'verified' : req.status === 'rejected' ? 'removed' : 'pending',
+            addedDate: req.createdAt,
+            verifiedDate: req.status === 'accepted' ? req.updatedAt : null,
+            removedDate: req.status === 'rejected' ? req.updatedAt : null,
+            bookingsCount: req.booking ? 1 : 0,
+          };
+        });
+
+        // Add current guarantor from profile if exists and not already in list
+        if (guarantor?.details && guarantor?.added) {
+          const alreadyInList = mapped.some(
+            (m) =>
+              (guarantor.details.phone && m.phone === guarantor.details.phone) ||
+              (guarantor.details.email && m.email === guarantor.details.email)
+          );
+          if (!alreadyInList) {
+            mapped.unshift({
+              id: 'current-guarantor',
+              name: guarantor.details.name || 'Guarantor',
+              phone: guarantor.details.phone || '',
+              email: guarantor.details.email || '',
+              relationship: guarantor.details.relationship || 'Guarantor',
+              status: guarantor.verified ? 'verified' : 'pending',
+              addedDate: guarantor.details.addedDate || new Date().toISOString(),
+              verifiedDate: guarantor.verified ? guarantor.details.verifiedDate || new Date().toISOString() : null,
+              removedDate: null,
+              bookingsCount: guarantor.details.bookingsCount || 0,
+            });
+          }
+        }
+
+        setGuarantorHistory(mapped);
+      } catch (error) {
+        console.error('Error fetching guarantor history:', error);
+        if (guarantor?.details && guarantor?.added) {
+          setGuarantorHistory([
+            {
+              id: 'current-guarantor',
+              name: guarantor.details.name || 'Guarantor',
+              phone: guarantor.details.phone || '',
+              email: guarantor.details.email || '',
+              relationship: guarantor.details.relationship || 'Guarantor',
+              status: guarantor.verified ? 'verified' : 'pending',
+              addedDate: guarantor.details.addedDate || new Date().toISOString(),
+              verifiedDate: guarantor.verified ? guarantor.details.verifiedDate || new Date().toISOString() : null,
+              removedDate: null,
+              bookingsCount: guarantor.details.bookingsCount || 0,
+            },
+          ]);
+        } else {
+          setGuarantorHistory([]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, [guarantor]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -137,7 +174,12 @@ const GuarantorHistoryPage = () => {
       {/* Content */}
       <div className="px-4 pt-4 pb-4 md:pt-6 md:pb-4">
         <div className="max-w-7xl mx-auto">
-          {guarantorHistory.length === 0 ? (
+          {loading ? (
+            <div className="bg-white rounded-xl p-8 shadow-md border text-center flex flex-col items-center justify-center" style={{ borderColor: theme.colors.borderLight }}>
+              <div className="w-10 h-10 border-4 border-t-transparent rounded-full animate-spin mb-3" style={{ borderColor: `${theme.colors.primary} transparent transparent transparent` }}></div>
+              <p className="text-sm font-medium" style={{ color: theme.colors.textSecondary }}>Loading guarantor history...</p>
+            </div>
+          ) : guarantorHistory.length === 0 ? (
             <div className="bg-white rounded-xl p-6 md:p-8 shadow-md border text-center" style={{ borderColor: theme.colors.borderLight }}>
               <div className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: `${theme.colors.primary}15` }}>
                 <svg className="w-8 h-8 md:w-10 md:h-10" style={{ color: theme.colors.primary }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

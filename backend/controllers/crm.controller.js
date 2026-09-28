@@ -2059,6 +2059,34 @@ export const updateAccidentCase = async (req, res) => {
 };
 
 /**
+ * @desc    Get Accident Case by ID
+ * @route   GET /api/crm/accidents/:id
+ * @access  Admin
+ */
+export const getAccidentCaseById = async (req, res) => {
+    try {
+        const accident = await AccidentCase.findById(req.params.id)
+            .populate('car', 'brand model registrationNumber images year color pricePerDay');
+
+        if (!accident) {
+            return res.status(404).json({ success: false, message: 'Accident case not found' });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: { accident }
+        });
+    } catch (error) {
+        console.error('Get accident by id error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error fetching accident case',
+            error: error.message
+        });
+    }
+};
+
+/**
  * @desc    Get Accident Loss & Recovery Summary
  * @route   GET /api/crm/reports/accident-summary
  * @access  Admin

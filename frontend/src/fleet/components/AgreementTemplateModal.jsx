@@ -5,16 +5,16 @@ import { Button } from '../../components/common';
 
 const DEFAULT_TEMPLATE = {
   title: 'DRIVEON SELF-DRIVE VEHICLE RENTAL AGREEMENT',
-  companyName: 'Urban Mobility Rentals Private Limited (DriveOn)',
-  companySubtitle: 'Fleet Inward Vehicle Custody & Rental Contract • Regulated under Motor Vehicles Act, 1988',
-  companyAddress: 'Fleet Operations & Custody Hub, Indore (M.P.)',
-  companyContact: '+91 99939 11855 | support@driveon.in',
+  companyName: 'DriveOn Self-Drive Rentals',
+  companySubtitle: 'Fleet Inward Vehicle Custody & Rental Contract • Regulated under Motor Vehicles Act',
+  companyAddress: '',
+  companyContact: '',
   terms: [
     'Inspection & Handover: Hirer confirms physical inspection of vehicle condition, fuel gauge, and existing scratches before taking delivery.',
     'Authorized Driver: The vehicle shall only be driven by the Hirer holding a valid, verified Driving License. Sub-leasing, lending, or commercial ride-hailing is strictly prohibited.',
-    'Traffic & Criminal Compliance: Hirer shall strictly adhere to speed limits (max 100 km/h), seatbelt laws, and zero alcohol/drugs. Any traffic challans, fines, or toll fees incurred during the tenure are exclusively the Hirer\'s liability.',
+    'Traffic & Criminal Compliance: Hirer shall strictly adhere to speed limits, seatbelt laws, and traffic regulations. Any traffic challans, fines, or toll fees incurred during the tenure are exclusively the Hirer\'s liability.',
     'Accident & Damage Liability: In case of accidental damage or mechanical abuse, the Hirer is liable to indemnify repair costs and downtime charges beyond standard insurance deductibles.',
-    'Return Condition: The vehicle must be returned on the agreed date/time. Late returns without prior intimation may incur penalty rates of Rs. 300/hour.',
+    'Return Condition: The vehicle must be returned on the agreed date/time. Late returns without prior intimation may incur penalty charges.',
     'Security Deposit & Collateral: Security deposit and vehicle collateral held will be refunded/returned after safe car return without damages.'
   ],
   customClauses: ''
@@ -36,16 +36,34 @@ const AgreementTemplateModal = ({ open, onClose, onSaveSuccess }) => {
       const fetchTemplate = async () => {
         setLoading(true);
         try {
-          const res = await api.get('/fleet/agreement-template');
-          if (res.data?.success && res.data?.data) {
+          const [res, settingsRes] = await Promise.all([
+            api.get('/fleet/agreement-template').catch(() => null),
+            api.get('/common/settings').catch(() => null)
+          ]);
+          
+          let initialTpl = { ...DEFAULT_TEMPLATE };
+          if (settingsRes?.data?.settings) {
+            const s = settingsRes.data.settings;
+            if (s.companyName) initialTpl.companyName = s.companyName;
+            if (s.supportPhone || s.supportEmail) {
+              initialTpl.companyContact = [s.supportPhone, s.supportEmail].filter(Boolean).join(' | ');
+            }
+            if (s.address) initialTpl.companyAddress = s.address;
+          }
+
+          if (res?.data?.success && res.data?.data) {
             setTemplate({
-              ...DEFAULT_TEMPLATE,
+              ...initialTpl,
               ...res.data.data,
-              terms: Array.isArray(res.data.data.terms) ? res.data.data.terms : DEFAULT_TEMPLATE.terms,
+              terms: Array.isArray(res.data.data.terms) && res.data.data.terms.length > 0 
+                ? res.data.data.terms 
+                : initialTpl.terms,
             });
+          } else {
+            setTemplate(initialTpl);
           }
         } catch (err) {
-          console.warn('Using default agreement template:', err);
+          console.warn('Error loading agreement template:', err);
         } finally {
           setLoading(false);
         }

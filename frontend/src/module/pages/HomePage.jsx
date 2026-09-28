@@ -18,12 +18,9 @@ import { carService } from "../../services/car.service";
 import { commonService } from "../../services/common.service";
 import { bannerService } from "../../services/banner.service";
 
-// Import car images
-import carImg1 from "../../assets/car_img1-removebg-preview.png";
-import carImg4 from "../../assets/car_img4-removebg-preview.png";
-import carImg5 from "../../assets/car_img5-removebg-preview.png";
-import carImg6 from "../../assets/car_img6-removebg-preview.png";
-import carImg8 from "../../assets/car_img8.png";
+// Default car placeholder image
+import defaultCarImg from "../../assets/car_img1-removebg-preview.png";
+
 
 // Brand logos for fallback mapping
 import logoToyota from "../../assets/car_logo2_PNG.png";
@@ -419,16 +416,13 @@ const HomePage = () => {
   const heroCta = currentHero.cta || "";
   const heroGradient = currentHero.gradient || colors.gradientPrimary;
 
-  // Fallback car images
-  const fallbackCarImages = [carImg1, carImg6, carImg8, carImg4, carImg5];
-
   // Transform API car data to CarCard format
-  const transformCarData = (car, index = 0) => {
+  const transformCarData = (car) => {
     if (!car) return null;
 
     // Extract all images from images array (same as admin side)
     let carImages = [];
-    let carImage = fallbackCarImages[index % fallbackCarImages.length];
+    let carImage = defaultCarImg;
 
     if (car.images && Array.isArray(car.images) && car.images.length > 0) {
       // Extract all image URLs (same as admin side)

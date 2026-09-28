@@ -18,20 +18,9 @@ import { bannerService } from "../../services/banner.service";
 import { useLocation } from "../../hooks/useLocation";
 import { useFavorites } from '../../context/FavoritesContext';
 
-// Use existing car images from assets
-import carImg1 from "../../assets/car_banImg1.jpg";
-import carImg2 from "../../assets/car_banImg2.jpg";
-import carImg3 from "../../assets/car_banImg3.jpg";
-import carImg4 from "../../assets/car_banImg4.jpg";
-import carImg5 from "../../assets/car_banImg5.jpg";
-import carImg6 from "../../assets/car_img6-removebg-preview.png";
-import nearbyImg1 from "../../assets/car_img8.png";
-import nearbyImg2 from "../../assets/car_img4-removebg-preview.png";
-import nearbyImg3 from "../../assets/car_img5-removebg-preview.png";
-import bannerCar1 from "../../assets/car_img1-removebg-preview.png";
-import bannerCar2 from "../../assets/car_img4-removebg-preview.png";
-import bannerCar3 from "../../assets/car_img5-removebg-preview.png";
-import bannerCar4 from "../../assets/car_img6-removebg-preview.png";
+// Default car image placeholder
+import defaultCarImg from "../../assets/car_img1-removebg-preview.png";
+
 import logo1 from "../../assets/car_logo1_PNG1.png";
 import logo2 from "../../assets/car_logo2_PNG.png";
 import logo3 from "../../assets/car_logo3_PNG.png";
@@ -47,6 +36,29 @@ import logo13 from "../../assets/car_logo13_PNG.png";
 import logo14 from "../../assets/car_logo14_PNG.png";
 import logo15 from "../../assets/car_logo15.png";
 import logo16 from "../../assets/car_logo16.png";
+
+// Helper to safely get cached data from localStorage for instant render
+const getCachedData = (key, fallback) => {
+  try {
+    const cached = localStorage.getItem(key);
+    return cached ? JSON.parse(cached) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+};
+
+const STATIC_PREMIUM_FLEET = [
+  { id: 1, name: "Toyota", logo: logo2, count: "10+" },
+  { id: 2, name: "Ferrari", logo: logo4, count: "10+" },
+  { id: 3, name: "Ford", logo: logo3, count: "10+" },
+  { id: 4, name: "Lamborghini", logo: logo5, count: "10+" },
+  { id: 5, name: "Kia", logo: logo1, count: "10+" },
+  { id: 6, name: "Skoda", logo: logo7, count: "10+" },
+  { id: 7, name: "Honda", logo: logo8, count: "10+" },
+  { id: 8, name: "Jaguar", logo: logo9, count: "10+" },
+  { id: 9, name: "Audi", logo: logo10, count: "10+" },
+  { id: 10, name: "Nissan", logo: logo11, count: "10+" },
+];
 
 /**
  * ModuleTestPage
@@ -67,15 +79,23 @@ const ModuleTestPage = () => {
     user?._id || user?.id
   );
 
-  // Dynamic data states
-  const [categories, setCategories] = useState([]);
-  const [brands, setBrands] = useState([]);
-  const [nearbyCars, setNearbyCars] = useState([]);
-  const [bestCars, setBestCars] = useState([]);
-  const [totalCarsCount, setTotalCarsCount] = useState(0);
-  const [featuredCar, setFeaturedCar] = useState(null);
-  const [activeBanners, setActiveBanners] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Instant cached data reads for 0ms millisecond initial render
+  const cachedBestCars = useMemo(() => getCachedData("driveon_best_cars", []), []);
+  const cachedNearbyCars = useMemo(() => getCachedData("driveon_nearby_cars", []), []);
+  const cachedCategories = useMemo(() => getCachedData("driveon_categories", []), []);
+  const cachedBanners = useMemo(() => getCachedData("driveon_active_banners", []), []);
+  const cachedBannerCars = useMemo(() => getCachedData("driveon_banner_cars", []), []);
+
+  // Dynamic data states initialized with cache
+  const [categories, setCategories] = useState(cachedCategories);
+  const [brands, setBrands] = useState(STATIC_PREMIUM_FLEET);
+  const [nearbyCars, setNearbyCars] = useState(cachedNearbyCars);
+  const [bestCars, setBestCars] = useState(cachedBestCars);
+  const [totalCarsCount, setTotalCarsCount] = useState(() => cachedBestCars.length);
+  const [featuredCar, setFeaturedCar] = useState(() => cachedBestCars[0] || null);
+  const [activeBanners, setActiveBanners] = useState(cachedBanners);
+  // If cache exists, isLoading is immediately false for instant UI
+  const [isLoading, setIsLoading] = useState(cachedBestCars.length === 0);
 
   // Banner Scroll Logic
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -84,10 +104,10 @@ const ModuleTestPage = () => {
   const isBannerPausedRef = useRef(false);
   const bannerPauseTimeoutRef = useRef(null);
 
-  // Dynamic Banner State
-  const [bannerCars, setBannerCars] = useState([]);
+  // Dynamic Banner State with cache
+  const [bannerCars, setBannerCars] = useState(cachedBannerCars);
 
-  // Fetch dynamic coupon banners
+  // Fetch dynamic coupon banners in background
   useEffect(() => {
     const fetchCouponBanners = async () => {
       try {
@@ -98,7 +118,7 @@ const ModuleTestPage = () => {
           if (activeCoupons.length > 0) {
             const dynamicBanners = activeCoupons.map(coupon => {
               const car = coupon.cars[0];
-              let carImage = bannerCar1; // Fallback
+              let carImage = defaultCarImg;
 
               if (car.images && car.images.length > 0) {
                 const img = car.images.find(i => i.isPrimary) || car.images[0];
@@ -119,42 +139,24 @@ const ModuleTestPage = () => {
             });
 
             setBannerCars(dynamicBanners);
+            localStorage.setItem("driveon_banner_cars", JSON.stringify(dynamicBanners));
           } else {
             // Revert to static if no active coupons with cars found
-            setBannerCars([
+            const fallbackBanners = [
               {
-                image: bannerCar1,
+                image: defaultCarImg,
                 alt: "Toyota Innova",
                 title: "20% Off Your First Ride!",
                 subtitle: "Experience Seamless Car Rentals.",
                 buttonText: "Discover More"
               }
-            ]);
+            ];
+            setBannerCars(fallbackBanners);
+            localStorage.setItem("driveon_banner_cars", JSON.stringify(fallbackBanners));
           }
-        } else {
-          // No coupons at all, revert to static
-          setBannerCars([
-            {
-              image: bannerCar1,
-              alt: "Toyota Innova",
-              title: "20% Off Your First Ride!",
-              subtitle: "Experience Seamless Car Rentals.",
-              buttonText: "Discover More"
-            }
-          ]);
         }
       } catch (error) {
         console.error("Failed to fetch coupon banners", error);
-        // Fallback on error
-        setBannerCars([
-          {
-            image: bannerCar1,
-            alt: "Toyota Innova",
-            title: "20% Off Your First Ride!",
-            subtitle: "Experience Seamless Car Rentals.",
-            buttonText: "Discover More"
-          }
-        ]);
       }
     };
 
@@ -242,18 +244,20 @@ const ModuleTestPage = () => {
     }, 5000);
   };
 
-  // Filter options state for FilterDropdown
-  const [filterOptions, setFilterOptions] = useState({
-    brands: [],
-    fuelTypes: [],
-    transmissions: [],
-    colors: [],
-    carTypes: [],
-    features: [],
-    seats: [],
-    ratings: [],
-    locations: [],
-  });
+  // Filter options state for FilterDropdown initialized with cache
+  const [filterOptions, setFilterOptions] = useState(() =>
+    getCachedData("driveon_filter_options", {
+      brands: [],
+      fuelTypes: [],
+      transmissions: [],
+      colors: [],
+      carTypes: [],
+      features: [],
+      seats: [],
+      ratings: [],
+      locations: [],
+    })
+  );
 
   // Applied filters state
   const [appliedFilters, setAppliedFilters] = useState({
@@ -337,30 +341,19 @@ const ModuleTestPage = () => {
 
   // Category images map
   const categoryImages = {
-    Sports: carImg1,
-    Electric: carImg2,
-    Legends: carImg3,
-    Classic: carImg4,
-    Coupe: carImg5,
-    SUV: carImg1,
-    Sedan: carImg2,
-    Hatchback: carImg3,
+    Sports: defaultCarImg,
+    Electric: defaultCarImg,
+    Legends: defaultCarImg,
+    Classic: defaultCarImg,
+    Coupe: defaultCarImg,
+    SUV: defaultCarImg,
+    Sedan: defaultCarImg,
+    Hatchback: defaultCarImg,
   };
 
-  // Fallback images for cars
-  const fallbackCarImages = [
-    carImg1,
-    nearbyImg1,
-    nearbyImg2,
-    nearbyImg3,
-    carImg6,
-    carImg4,
-    carImg5,
-  ];
-
   // Transform car data
-  const transformCarData = (car, index = 0) => {
-    let carImage = fallbackCarImages[index % fallbackCarImages.length];
+  const transformCarData = (car) => {
+    let carImage = defaultCarImg;
 
     if (car.images && car.images.length > 0) {
       const primaryImage = car.images.find((img) => img.isPrimary);
@@ -563,272 +556,249 @@ const ModuleTestPage = () => {
     navigate("/search");
   };
 
-  // Fetch dynamic data from API
+  // Parallel background data fetching (Promise.allSettled) with stale-while-revalidate
   useEffect(() => {
+    let isMounted = true;
+
     const fetchData = async () => {
       try {
-        setIsLoading(true);
-
-        // Fetch categories (car types) with counts
-        const carTypesResponse = await carService.getTopCarTypes({ limit: 10 });
-        if (carTypesResponse.success && carTypesResponse.data?.carTypes) {
-          const carTypes = carTypesResponse.data.carTypes.map(
-            (type, index) => ({
-              id: index + 1,
-              label: type.name || type.carType || type,
-              carType: type.carType || type.name?.toLowerCase() || type?.toLowerCase() || '',
-              count: type.count || 0,
-              image:
-                categoryImages[type.name || type.carType || type] ||
-                categoryImages.Sports,
-            })
-          );
-          setCategories(carTypes);
+        // Only set loading if no cached best cars are available
+        if (bestCars.length === 0) {
+          setIsLoading(true);
         }
 
-        // Set static premium fleet brands as requested
-        const premiumFleetData = [
-          { id: 1, name: "Toyota", logo: logo2 },
-          { id: 2, name: "Ferrari", logo: logo4 },
-          { id: 3, name: "Ford", logo: logo3 },
-          { id: 4, name: "Lamborghini", logo: logo5 },
-          { id: 5, name: "Kia", logo: logo1 },
-          { id: 6, name: "Skoda", logo: logo7 },
-          { id: 7, name: "Honda", logo: logo8 },
-          { id: 8, name: "Jaguar", logo: logo9 },
-          { id: 9, name: "Audi", logo: logo10 },
-          { id: 10, name: "Nissan", logo: logo11 },
-        ];
-        
-        // Add count property to match structure
-        const formattedBrands = premiumFleetData.map(brand => ({
-          ...brand,
-          count: '10+' // Placeholder count
-        }));
-        
-        setBrands(formattedBrands);
-
-        // Fetch nearby cars (using user's coordinates if available)
-        const nearbyParams = {
-          limit: 3,
-        };
-        if (coordinates && coordinates.lat && coordinates.lng) {
+        const nearbyParams = { limit: 3 };
+        if (coordinates?.lat && coordinates?.lng) {
           nearbyParams.latitude = coordinates.lat;
           nearbyParams.longitude = coordinates.lng;
         }
-        const nearbyResponse = await carService.getNearbyCars(nearbyParams);
-        if (nearbyResponse.success && nearbyResponse.data?.cars) {
-          const nearbyCarsData = nearbyResponse.data.cars
-            .slice(0, 3)
-            .map((car, index) => transformCarData(car, index));
-          setNearbyCars(nearbyCarsData);
+
+        // Run ALL requests concurrently in parallel!
+        const [carTypesRes, nearbyRes, bestCarsRes, bannersRes, allCarsRes] = await Promise.allSettled([
+          carService.getTopCarTypes({ limit: 10 }),
+          carService.getNearbyCars(nearbyParams),
+          carService.getCars({
+            isFeatured: true,
+            status: "active",
+            isAvailable: true,
+            limit: 50,
+          }),
+          bannerService.getActiveBanners().catch(() => null),
+          carService.getCars({
+            limit: 60,
+            status: "active",
+            isAvailable: true,
+          }),
+        ]);
+
+        if (!isMounted) return;
+
+        // 1. Process car types
+        if (carTypesRes.status === "fulfilled" && carTypesRes.value?.success && carTypesRes.value.data?.carTypes) {
+          const typesData = carTypesRes.value.data.carTypes.map((type, index) => ({
+            id: index + 1,
+            label: type.name || type.carType || type,
+            carType: type.carType || type.name?.toLowerCase() || type?.toLowerCase() || "",
+            count: type.count || 0,
+            image: categoryImages[type.name || type.carType || type] || categoryImages.Sports,
+          }));
+          setCategories(typesData);
+          localStorage.setItem("driveon_categories", JSON.stringify(typesData));
         }
 
-        // Fetch best cars (latest/featured cars)
-        const bestCarsResponse = await carService.getCars({
-          isFeatured: true,
-          status: "active",
-          isAvailable: true,
-          limit: 100,
-        });
-        if (bestCarsResponse.success && bestCarsResponse.data?.cars) {
-          const bestCarsData = bestCarsResponse.data.cars
-            .map((car, index) => transformCarData(car, index));
-          setBestCars(bestCarsData);
+        // 2. Process nearby cars
+        if (nearbyRes.status === "fulfilled" && nearbyRes.value?.success && nearbyRes.value.data?.cars) {
+          const nearbyData = nearbyRes.value.data.cars.slice(0, 3).map((car, index) => transformCarData(car, index));
+          setNearbyCars(nearbyData);
+          localStorage.setItem("driveon_nearby_cars", JSON.stringify(nearbyData));
+        }
 
-          // Set featured car (first one)
-          if (bestCarsResponse.data.cars.length > 0) {
-            setFeaturedCar(transformCarData(bestCarsResponse.data.cars[0], 0));
+        // 3. Process best cars
+        if (bestCarsRes.status === "fulfilled" && bestCarsRes.value?.success && bestCarsRes.value.data?.cars) {
+          const bestData = bestCarsRes.value.data.cars.map((car, index) => transformCarData(car, index));
+          setBestCars(bestData);
+          localStorage.setItem("driveon_best_cars", JSON.stringify(bestData));
+          if (bestData.length > 0) {
+            setFeaturedCar(bestData[0]);
           }
         }
 
-        // Fetch active banners
-        try {
-          const bannersResponse = await bannerService.getActiveBanners();
-          if (bannersResponse.success && bannersResponse.data?.banners) {
-            setActiveBanners(bannersResponse.data.banners);
+        // 4. Process active banners
+        if (bannersRes.status === "fulfilled" && bannersRes.value?.success && bannersRes.value.data?.banners) {
+          setActiveBanners(bannersRes.value.data.banners);
+          localStorage.setItem("driveon_active_banners", JSON.stringify(bannersRes.value.data.banners));
+        }
+
+        // 5. Process all cars for filter options
+        if (allCarsRes.status === "fulfilled" && allCarsRes.value?.success) {
+          if (allCarsRes.value.data?.pagination?.total) {
+            setTotalCarsCount(allCarsRes.value.data.pagination.total);
           }
-        } catch (bannerErr) {
-          console.error("Error fetching active banners in mobile page:", bannerErr);
-        }
+          if (allCarsRes.value.data?.cars) {
+            const cars = allCarsRes.value.data.cars;
+            const transformedAllCars = cars.map((car, index) => transformCarData(car, index));
+            setAllCars(transformedAllCars);
 
-        // Fetch all cars to extract filter options
-        const allCarsResponse = await carService.getCars({
-          limit: 100, // Get more cars to extract filter options
-          status: "active",
-          isAvailable: true,
-        });
+            // If bestCarsRes failed or empty, fallback to featured cars from allCars
+            if ((!bestCarsRes.value?.data?.cars || bestCarsRes.value.data.cars.length === 0) && transformedAllCars.length > 0) {
+              const featuredFromAll = transformedAllCars.filter(c => c.isFeatured);
+              const fallbackBest = featuredFromAll.length > 0 ? featuredFromAll : transformedAllCars;
+              setBestCars(fallbackBest);
+              localStorage.setItem("driveon_best_cars", JSON.stringify(fallbackBest));
+            }
 
-        if (allCarsResponse.success && allCarsResponse.data?.pagination) {
-          setTotalCarsCount(allCarsResponse.data.pagination.total || 0);
-        }
+            // Extract unique brands
+            const uniqueBrands = Array.from(new Set(cars.map((car) => car.brand).filter(Boolean))).sort();
 
-        // Extract filter options from all cars and store cars for filtering
-        if (allCarsResponse.success && allCarsResponse.data?.cars) {
-          const cars = allCarsResponse.data.cars;
-
-          // Store all cars for filtering
-          const transformedAllCars = cars.map((car, index) =>
-            transformCarData(car, index)
-          );
-          setAllCars(transformedAllCars);
-
-          // Extract unique brands
-          const uniqueBrands = Array.from(
-            new Set(cars.map((car) => car.brand).filter(Boolean))
-          ).sort();
-
-          // Extract unique fuel types
-          const uniqueFuelTypes = Array.from(
-            new Set(
-              cars
-                .map((car) => {
+            // Extract unique fuel types
+            const uniqueFuelTypes = Array.from(
+              new Set(
+                cars.map((car) => {
                   const fuel = car.fuelType || "";
                   if (fuel.toLowerCase() === "petrol") return "Petrol";
                   if (fuel.toLowerCase() === "diesel") return "Diesel";
                   if (fuel.toLowerCase() === "electric") return "Electric";
                   if (fuel.toLowerCase() === "hybrid") return "Hybrid";
-                  return (
-                    fuel.charAt(0).toUpperCase() + fuel.slice(1).toLowerCase()
-                  );
-                })
-                .filter(Boolean)
-            )
-          ).sort();
+                  return fuel.charAt(0).toUpperCase() + fuel.slice(1).toLowerCase();
+                }).filter(Boolean)
+              )
+            ).sort();
 
-          // Extract unique transmissions
-          const uniqueTransmissions = Array.from(
-            new Set(
-              cars
-                .map((car) => {
+            // Extract unique transmissions
+            const uniqueTransmissions = Array.from(
+              new Set(
+                cars.map((car) => {
                   const trans = car.transmission || "";
                   if (trans.toLowerCase() === "automatic") return "Automatic";
                   if (trans.toLowerCase() === "manual") return "Manual";
                   if (trans.toLowerCase() === "cvt") return "CVT";
-                  return (
-                    trans.charAt(0).toUpperCase() + trans.slice(1).toLowerCase()
-                  );
-                })
-                .filter(Boolean)
-            )
-          ).sort();
+                  return trans.charAt(0).toUpperCase() + trans.slice(1).toLowerCase();
+                }).filter(Boolean)
+              )
+            ).sort();
 
-          // Extract unique colors
-          const uniqueColors = Array.from(
-            new Set(
-              cars
-                .map((car) => {
+            // Extract unique colors
+            const uniqueColors = Array.from(
+              new Set(
+                cars.map((car) => {
                   const color = car.color || "";
-                  return (
-                    color.charAt(0).toUpperCase() + color.slice(1).toLowerCase()
-                  );
-                })
-                .filter(Boolean)
-            )
-          ).sort();
+                  return color.charAt(0).toUpperCase() + color.slice(1).toLowerCase();
+                }).filter(Boolean)
+              )
+            ).sort();
 
-          // Extract unique car types
-          const uniqueCarTypes = Array.from(
-            new Set(
-              cars
-                .map((car) => {
+            // Extract unique car types
+            const uniqueCarTypes = Array.from(
+              new Set(
+                cars.map((car) => {
                   const type = car.carType || car.bodyType || "";
-                  return (
-                    type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()
-                  );
-                })
-                .filter(Boolean)
-            )
-          ).sort();
+                  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+                }).filter(Boolean)
+              )
+            ).sort();
 
-          // Extract all unique features
-          const allFeatures = cars
-            .flatMap((car) => car.features || [])
-            .filter(Boolean);
-          const uniqueFeatures = Array.from(new Set(allFeatures)).sort();
+            // Extract all unique features
+            const allFeatures = cars.flatMap((car) => car.features || []).filter(Boolean);
+            const uniqueFeatures = Array.from(new Set(allFeatures)).sort();
 
-          // Extract unique seat counts
-          const uniqueSeats = Array.from(
-            new Set(
-              cars
-                .map((car) => car.seatingCapacity || car.seats)
-                .filter(Boolean)
-            )
-          )
-            .map((seats) => String(seats))
-            .sort((a, b) => parseInt(a) - parseInt(b));
+            // Extract unique seat counts
+            const uniqueSeats = Array.from(
+              new Set(cars.map((car) => car.seatingCapacity || car.seats).filter(Boolean))
+            ).map((seats) => String(seats)).sort((a, b) => parseInt(a) - parseInt(b));
 
-          // Helper to capitalize city names
-          const capitalizeCity = (city) => {
-            if (!city) return '';
-            return city
-              .toLowerCase()
-              .split(' ')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ')
-              .trim();
-          };
+            // Helper to capitalize city names
+            const capitalizeCity = (city) => {
+              if (!city) return '';
+              return city.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ').trim();
+            };
 
-          // Extract unique locations case-insensitively
-          const uniqueLocationsMap = new Map();
-          cars.forEach((car) => {
-            const loc =
-              car.location?.city ||
-              car.location?.address ||
-              car.location ||
-              "";
-            if (loc.trim()) {
-              const normalized = capitalizeCity(loc);
-              const key = normalized.toLowerCase();
-              if (!uniqueLocationsMap.has(key)) {
-                uniqueLocationsMap.set(key, normalized);
+            // Extract unique locations case-insensitively
+            const uniqueLocationsMap = new Map();
+            cars.forEach((car) => {
+              const loc = car.location?.city || car.location?.address || car.location || "";
+              if (loc.trim()) {
+                const normalized = capitalizeCity(loc);
+                const key = normalized.toLowerCase();
+                if (!uniqueLocationsMap.has(key)) {
+                  uniqueLocationsMap.set(key, normalized);
+                }
               }
+            });
+            const uniqueLocations = Array.from(uniqueLocationsMap.values()).sort();
+
+            // Extract unique ratings
+            const allRatings = cars
+              .map((car) => parseFloat(car.averageRating || car.rating || 0))
+              .filter((r) => r > 0);
+
+            const ratingOptions = [];
+            if (allRatings.length > 0) {
+              const maxRating = Math.max(...allRatings);
+              if (maxRating >= 4.0) ratingOptions.push("4.0+");
+              if (maxRating >= 4.5) ratingOptions.push("4.5+");
+              if (maxRating >= 5.0) ratingOptions.push("5.0");
             }
-          });
-          const uniqueLocations = Array.from(uniqueLocationsMap.values()).sort();
 
+            const newFilterOptions = {
+              brands: uniqueBrands,
+              fuelTypes: uniqueFuelTypes,
+              transmissions: uniqueTransmissions,
+              colors: uniqueColors,
+              carTypes: uniqueCarTypes,
+              features: uniqueFeatures,
+              seats: uniqueSeats,
+              ratings: ratingOptions,
+              locations: uniqueLocations,
+            };
 
-          // Extract unique ratings and create rating options
-          const allRatings = cars
-            .map((car) => {
-              const rating = car.averageRating || car.rating || 0;
-              return parseFloat(rating) || 0;
-            })
-            .filter((rating) => rating > 0);
-
-          // Create rating filter options based on available ratings
-          const ratingOptions = [];
-          if (allRatings.length > 0) {
-            const maxRating = Math.max(...allRatings);
-            const minRating = Math.min(...allRatings);
-            if (maxRating >= 4.0) ratingOptions.push("4.0+");
-            if (maxRating >= 4.5) ratingOptions.push("4.5+");
-            if (maxRating >= 5.0) ratingOptions.push("5.0");
+            setFilterOptions(newFilterOptions);
+            localStorage.setItem("driveon_filter_options", JSON.stringify(newFilterOptions));
           }
-
-          // Set filter options
-          setFilterOptions({
-            brands: uniqueBrands,
-            fuelTypes: uniqueFuelTypes,
-            transmissions: uniqueTransmissions,
-            colors: uniqueColors,
-            carTypes: uniqueCarTypes,
-            features: uniqueFeatures,
-            seats: uniqueSeats,
-            ratings: ratingOptions,
-            locations: uniqueLocations,
-          });
         }
       } catch (error) {
         console.error("Error fetching data:", error);
-        // Keep default/empty data on error
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchData();
-  }, [coordinates]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Silently update nearby cars when user coordinates resolve
+  useEffect(() => {
+    if (!coordinates?.lat || !coordinates?.lng) return;
+    let isCancelled = false;
+
+    const updateNearby = async () => {
+      try {
+        const response = await carService.getNearbyCars({
+          latitude: coordinates.lat,
+          longitude: coordinates.lng,
+          limit: 3,
+        });
+        if (!isCancelled && response.success && response.data?.cars) {
+          const data = response.data.cars.slice(0, 3).map((car, index) => transformCarData(car, index));
+          setNearbyCars(data);
+          localStorage.setItem("driveon_nearby_cars", JSON.stringify(data));
+        }
+      } catch (e) {
+        console.error("Silent update nearby cars error:", e);
+      }
+    };
+
+    updateNearby();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [coordinates?.lat, coordinates?.lng]);
 
   // Auto focus input when search becomes active
   useEffect(() => {
@@ -1273,7 +1243,7 @@ const ModuleTestPage = () => {
             transition={{ duration: 0.4, delay: 0.1 }}
           >
             <div className="flex gap-3 overflow-x-auto scrollbar-hide">
-              {isLoading
+              {isLoading && categories.length === 0
                 ? Array.from({ length: 5 }).map((_, index) => (
                   <div key={`skel-cat-${index}`} className="flex-shrink-0 w-24">
                     <div className="w-24 h-20 rounded-xl mb-2 bg-gray-200 animate-pulse shadow-sm"></div>
@@ -1341,31 +1311,24 @@ const ModuleTestPage = () => {
               <div className="absolute top-0 left-0 w-8 h-full bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
               <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
 
-              <div className={`flex gap-4 py-2 ${isLoading ? "overflow-hidden" : "brands-scroll"}`}>
-                {isLoading
-                  ? Array.from({ length: 6 }).map((_, index) => (
-                    <div key={`skel-brand-${index}`} className="flex flex-col items-center gap-2 shrink-0">
-                      <div className="w-20 h-20 rounded-2xl bg-gray-200 animate-pulse border border-gray-100"></div>
-                      <div className="w-12 h-3 bg-gray-200 animate-pulse rounded"></div>
+              <div className="flex gap-4 py-2 brands-scroll">
+                {brands.concat(brands).map((brand, index) => (
+                  <div
+                    key={`${brand.id}-${index}`}
+                    className="flex flex-col items-center gap-2 shrink-0 group"
+                  >
+                    <div className="w-20 h-20 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center p-4 transition-all duration-300">
+                      <img
+                        src={brand.logo}
+                        alt={brand.name}
+                        className="w-full h-full object-contain filter grayscale contrast-125 opacity-70 transition-all duration-300"
+                      />
                     </div>
-                  ))
-                  : brands.concat(brands).map((brand, index) => (
-                    <div
-                      key={`${brand.id}-${index}`}
-                      className="flex flex-col items-center gap-2 shrink-0 group"
-                    >
-                      <div className="w-20 h-20 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center p-4 transition-all duration-300">
-                        <img
-                          src={brand.logo}
-                          alt={brand.name}
-                          className="w-full h-full object-contain filter grayscale contrast-125 opacity-70 transition-all duration-300"
-                        />
-                      </div>
-                      <span className="text-xs font-bold text-gray-500 transition-colors">
-                        {brand.name}
-                      </span>
-                    </div>
-                  ))}
+                    <span className="text-xs font-bold text-gray-500 transition-colors">
+                      {brand.name}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
             <style>{`
@@ -1413,7 +1376,7 @@ const ModuleTestPage = () => {
 
             {/* Car Cards Slide 1 (Top Slider) - Alternating index % 2 === 0 */}
             <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-0 mb-4">
-              {isLoading
+              {isLoading && bestCars.length === 0
                 ? Array.from({ length: 2 }).map((_, index) => (
                   <div
                     key={`skel-best-top-${index}`}
@@ -1597,7 +1560,7 @@ const ModuleTestPage = () => {
 
             {/* Car Cards Slide 2 (Bottom Slider) - Alternating index % 2 === 1 */}
             <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-0 mb-6">
-              {isLoading
+              {isLoading && bestCars.length === 0
                 ? Array.from({ length: 2 }).map((_, index) => (
                   <div
                     key={`skel-best-bottom-${index}`}

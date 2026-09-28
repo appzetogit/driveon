@@ -7,12 +7,9 @@ import reviewService from '../../services/review.service';
 import carService from '../../services/car.service';
 import toastUtils from '../../config/toast';
 
-// Import car images - matching CarDetailsPage
-import carImg1 from '../../assets/car_img1-removebg-preview.png';
-import carImg4 from '../../assets/car_img4-removebg-preview.png';
-import carImg5 from '../../assets/car_img5-removebg-preview.png';
-import carImg6 from '../../assets/car_img6-removebg-preview.png';
-import carImg8 from '../../assets/car_img8.png';
+// Default placeholder for car image
+import defaultCarImg from '../../assets/car_img1-removebg-preview.png';
+
 
 /**
  * CarReviewsPage Component
@@ -39,19 +36,19 @@ const CarReviewsPage = () => {
         brand: initialCar.brand || '',
         model: initialCar.model || '',
         name: initialCar.name || `${initialCar.brand || ''} ${initialCar.model || ''}`.trim() || '',
-        image: initialCar.image || initialCar.images?.[0] || carImg1,
+        image: initialCar.image || initialCar.images?.[0] || defaultCarImg,
         rating: initialCar.rating || initialCar.averageRating || 0,
         reviewsCount: initialCar.reviewsCount || 0,
       };
     }
     return {
-    id,
-    brand: '',
-    model: '',
-    name: '',
-    image: carImg1,
-    rating: 0,
-    reviewsCount: 0,
+      id,
+      brand: '',
+      model: '',
+      name: '',
+      image: defaultCarImg,
+      rating: 0,
+      reviewsCount: 0,
     };
   };
 
@@ -80,7 +77,7 @@ const CarReviewsPage = () => {
           const apiCar = response.data.car;
 
           // Resolve primary image from images array
-          let image = carImg1;
+          let image = defaultCarImg;
           if (apiCar.images && Array.isArray(apiCar.images) && apiCar.images.length > 0) {
             const primary = apiCar.images.find((img) => img.isPrimary);
             image = primary ? primary.url : (apiCar.images[0]?.url || image);
@@ -321,7 +318,7 @@ const CarReviewsPage = () => {
                   className="relative flex items-center justify-center w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14"
                 >
                   {/* Circular profile icon with white border */}
-                  <div className="w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-full border-2 border-white flex items-center justify-center overflow-hidden bg-gray-800">
+                  <div className="w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-full border-2 border-white flex items-center justify-center overflow-hidden bg-indigo-600 text-white font-bold text-sm">
                     {user?.profilePhoto ? (
                       <img
                         src={user.profilePhoto}
@@ -329,11 +326,7 @@ const CarReviewsPage = () => {
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
-                      <img
-                        src={carImg1}
-                        alt="Profile"
-                        className="w-full h-full rounded-full object-cover"
-                      />
+                      <span>{user?.name ? user.name.charAt(0).toUpperCase() : 'U'}</span>
                     )}
                   </div>
                 </Link>

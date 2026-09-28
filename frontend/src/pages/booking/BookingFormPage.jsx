@@ -1,15 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { theme } from '../../theme/theme.constants';
-import carImg1 from '../../assets/car_img1-removebg-preview.png';
-import carImg2 from '../../assets/car_img2-removebg-preview.png';
-import carImg3 from '../../assets/car_img3-removebg-preview.png';
-import carImg4 from '../../assets/car_img4-removebg-preview.png';
-import carImg5 from '../../assets/car_img5-removebg-preview.png';
-import carImg6 from '../../assets/car_img6-removebg-preview.png';
-import carImg7 from '../../assets/car_img7-removebg-preview.png';
+import defaultCarImg from '../../assets/car_img1-removebg-preview.png';
 import toastUtils from '../../config/toast';
 import { commonService } from '../../services/common.service';
+import { carService } from '../../services/car.service';
 
 /**
  * BookingFormPage Component
@@ -50,18 +45,44 @@ const BookingFormPage = () => {
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [calendarSelectedDate, setCalendarSelectedDate] = useState(null);
 
-  // Mock car data
-  const carsData = {
-    '1': { id: '1', brand: 'Tesla', model: 'Model X', price: 180, image: carImg1 },
-    '2': { id: '2', brand: 'Mercedes-Benz', model: 'S-Class', price: 220, image: carImg2 },
-    '3': { id: '3', brand: 'BMW', model: '7 Series', price: 200, image: carImg3 },
-    '4': { id: '4', brand: 'Audi', model: 'A8 L', price: 210, image: carImg4 },
-    '5': { id: '5', brand: 'Jaguar', model: 'XF', price: 175, image: carImg5 },
-    '6': { id: '6', brand: 'Lexus', model: 'LS 500', price: 195, image: carImg6 },
-    '7': { id: '7', brand: 'Porsche', model: 'Panamera', price: 250, image: carImg7 },
-  };
+  // Dynamic car details
+  const [car, setCar] = useState(null);
+  const [loadingCar, setLoadingCar] = useState(true);
 
-  const car = carsData[carId];
+  useEffect(() => {
+    const fetchCar = async () => {
+      if (!carId) {
+        setLoadingCar(false);
+        return;
+      }
+      try {
+        setLoadingCar(true);
+        const res = await carService.getCarDetails(carId);
+        if (res.success && res.data?.car) {
+          const c = res.data.car;
+          let img = defaultCarImg;
+          if (c.images && c.images.length > 0) {
+            const p = c.images.find(i => i.isPrimary) || c.images[0];
+            img = p.url || p.path || p;
+          } else if (c.image) {
+            img = c.image.url || c.image;
+          }
+          setCar({
+            id: c._id || c.id,
+            brand: c.brand || '',
+            model: c.model || '',
+            price: c.pricePerDay || c.price || 0,
+            image: img
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching car in booking form:', err);
+      } finally {
+        setLoadingCar(false);
+      }
+    };
+    fetchCar();
+  }, [carId]);
 
   // Calculate dynamic price
   const calculatePrice = () => {
@@ -187,14 +208,24 @@ const BookingFormPage = () => {
     });
   };
 
-  useEffect(() => {
-    if (!car) {
-      navigate('/cars');
-    }
-  }, [car, navigate]);
+  if (loadingCar) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   if (!car) {
-    return null;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <h2 className="text-xl font-bold mb-2">Car Not Found</h2>
+        <p className="text-gray-500 mb-4 text-sm">The selected car could not be loaded.</p>
+        <button onClick={() => navigate(-1)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">
+          Go Back
+        </button>
+      </div>
+    );
   }
 
   return (

@@ -1,18 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { theme } from '../../theme/theme.constants';
-import carImg1 from '../../assets/car_img1-removebg-preview.png';
-import carImg2 from '../../assets/car_img2-removebg-preview.png';
-import carImg3 from '../../assets/car_img3-removebg-preview.png';
-import carImg4 from '../../assets/car_img4-removebg-preview.png';
-import carImg5 from '../../assets/car_img5-removebg-preview.png';
-import carImg6 from '../../assets/car_img6-removebg-preview.png';
-import carImg7 from '../../assets/car_img7-removebg-preview.png';
+import defaultCarImg from '../../assets/car_img1-removebg-preview.png';
+import bookingService from '../../services/booking.service';
+import reviewService from '../../services/review.service';
+import toastUtils from '../../config/toast';
 
 /**
  * ReviewFormPage Component
  * Form for users to write reviews after trip completion
- * Based on document.txt - User rates car, trip experience, and car owner ratings
+ * Connects directly to backend Review API
  */
 const ReviewFormPage = () => {
   const { bookingId } = useParams();
@@ -24,95 +21,41 @@ const ReviewFormPage = () => {
   const [comment, setComment] = useState('');
   const [hoveredRating, setHoveredRating] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [booking, setBooking] = useState(location.state?.booking || null);
+  const [loadingBooking, setLoadingBooking] = useState(!location.state?.booking);
 
-  // Mock booking data
-  const getCarImage = (carId) => {
-    const images = {
-      car1: carImg1,
-      car2: carImg2,
-      car3: carImg3,
-      car4: carImg4,
-      car5: carImg5,
-      car6: carImg6,
-      car7: carImg7,
-    };
-    return images[carId] || carImg1;
-  };
-
-  const mockBookings = {
-    '1': {
-      id: '1',
-      car: {
-        id: 'car1',
-        brand: 'Toyota',
-        model: 'Camry',
-        image: getCarImage('car1'),
-      },
-      pickupDate: '2024-01-10',
-      dropDate: '2024-01-12',
-      ownerName: 'Rajesh Kumar',
-    },
-    '2': {
-      id: '2',
-      car: {
-        id: 'car2',
-        brand: 'Honda',
-        model: 'City',
-        image: getCarImage('car2'),
-      },
-      pickupDate: '2024-01-05',
-      dropDate: '2024-01-07',
-      ownerName: 'Priya Sharma',
-    },
-    '3': {
-      id: '3',
-      car: {
-        id: 'car3',
-        brand: 'Maruti',
-        model: 'Swift',
-        image: getCarImage('car3'),
-      },
-      pickupDate: '2023-12-28',
-      dropDate: '2023-12-30',
-      ownerName: 'Amit Singh',
-    },
-    '4': {
-      id: '4',
-      car: {
-        id: 'car4',
-        brand: 'Hyundai',
-        model: 'i20',
-        image: getCarImage('car4'),
-      },
-      pickupDate: '2023-12-20',
-      dropDate: '2023-12-22',
-      ownerName: 'Deepika Reddy',
-    },
-    '5': {
-      id: '5',
-      car: {
-        id: 'car5',
-        brand: 'Tata',
-        model: 'Nexon',
-        image: getCarImage('car5'),
-      },
-      pickupDate: '2023-12-25',
-      dropDate: '2023-12-27',
-      ownerName: 'Vikram Rao',
-    },
-  };
-
-  const booking = mockBookings[bookingId];
-
-  // Redirect if booking not found
+  // Fetch real booking details
   useEffect(() => {
-    if (!booking) {
-      navigate('/bookings');
-    }
-  }, [booking, navigate]);
+    const fetchBooking = async () => {
+      if (!bookingId || booking) {
+        setLoadingBooking(false);
+        return;
+      }
+      try {
+        setLoadingBooking(true);
+        const res = await bookingService.getBookingDetails(bookingId);
+        if (res.success && res.data?.booking) {
+          setBooking(res.data.booking);
+        } else {
+          setBooking(null);
+        }
+      } catch (err) {
+        console.error('Error fetching booking for review:', err);
+        setBooking(null);
+      } finally {
+        setLoadingBooking(false);
+      }
+    };
+    fetchBooking();
+  }, [bookingId, booking]);
 
-  if (!booking) {
-    return null;
+  const car = booking?.car || {};
+  let carImage = defaultCarImg;
+  if (car.images && car.images.length > 0) {
+    const primary = car.images.find(i => i.isPrimary) || car.images[0];
+    carImage = primary.url || primary.path || primary;
+  } else if (car.image) {
+    carImage = car.image.url || car.image;
   }
 
   // Render star rating component
@@ -161,24 +104,53 @@ const ReviewFormPage = () => {
     e.preventDefault();
 
     if (tripRating === 0) {
-      alert('Please rate your trip experience');
+      toastUtils.error('Please rate your trip experience');
       return;
     }
 
     if (!comment.trim()) {
-      alert('Please write a review comment');
+      toastUtils.error('Please write a review comment');
       return;
     }
 
     setIsSubmitting(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      // Navigate back to bookings page
+    try {
+      await reviewService.submitReview(bookingId, {
+        tripExperienceRating: tripRating,
+        carRating: tripRating,
+        ownerRating: tripRating,
+        overallRating: tripRating,
+        comment: comment.trim(),
+      });
+      toastUtils.success('Review submitted successfully!');
       navigate('/bookings', { state: { reviewSubmitted: true } });
-    }, 1500);
+    } catch (err) {
+      console.error('Failed to submit review:', err);
+      toastUtils.error(err.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (loadingBooking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <h2 className="text-xl font-bold mb-2">Booking Not Found</h2>
+        <p className="text-gray-500 mb-4 text-sm">Cannot write a review for an invalid booking.</p>
+        <button onClick={() => navigate('/bookings')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">
+          Go to My Bookings
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-24 bg-white">
@@ -203,82 +175,57 @@ const ReviewFormPage = () => {
         </div>
       </header>
 
-      {/* Car Summary Card */}
-      <div className="px-4 pt-4 pb-2 md:pt-6 md:pb-2">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-lg md:rounded-xl p-3 md:p-4 flex items-center gap-3 shadow-md hover:shadow-lg transition-shadow border" style={{ borderColor: theme.colors.borderLight }}>
-            <img src={booking.car.image} alt={`${booking.car.brand} ${booking.car.model}`} className="w-16 h-16 md:w-20 md:h-20 object-contain" />
-            <div className="flex-1">
-              <h3 className="font-bold text-base md:text-lg" style={{ color: theme.colors.textPrimary }}>{booking.car.brand} {booking.car.model}</h3>
-              <p className="text-sm md:text-base" style={{ color: theme.colors.textSecondary }}>
-                {booking.pickupDate} to {booking.dropDate}
-              </p>
-            </div>
+      {/* Main Content */}
+      <main className="max-w-2xl mx-auto px-4 py-6 md:px-6">
+        {/* Car Summary Card */}
+        <div className="bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100 flex items-center gap-4">
+          <div className="w-20 h-16 rounded-xl bg-white p-2 flex items-center justify-center border border-gray-200">
+            <img src={carImage} alt={`${car.brand || ''} ${car.model || ''}`} className="max-h-full max-w-full object-contain" />
+          </div>
+          <div>
+            <h3 className="font-bold text-base text-gray-900">{car.brand || 'Vehicle'} {car.model || ''}</h3>
+            <p className="text-xs text-gray-500">Booking #{booking.bookingId || bookingId}</p>
           </div>
         </div>
-      </div>
 
-      {/* Review Form */}
-      <form onSubmit={handleSubmit} className="px-4 pt-4 pb-2 md:pt-6 md:pb-2 space-y-3 md:space-y-4">
-        <div className="max-w-4xl mx-auto">
-          {/* Trip Experience Rating */}
-          <div className="bg-white rounded-lg md:rounded-xl p-3 md:p-4 shadow-md hover:shadow-lg transition-shadow border" style={{ borderColor: theme.colors.borderLight }}>
+        {/* Review Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
             {renderStarRating(
               tripRating,
               hoveredRating,
               setTripRating,
-              (star) => setHoveredRating(star),
+              setHoveredRating,
               () => setHoveredRating(0),
-              'Rate Your Trip Experience'
+              'Overall Experience Rating *'
             )}
+
+            <div>
+              <label className="block text-sm font-semibold mb-2 text-gray-700">
+                Your Feedback & Comments *
+              </label>
+              <textarea
+                rows={4}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Share your driving experience, vehicle condition, and overall service..."
+                className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-600 transition-colors"
+                required
+              />
+            </div>
           </div>
 
-          {/* Review Comment */}
-          <div className="bg-white rounded-lg md:rounded-xl p-3 md:p-4 shadow-md hover:shadow-lg transition-shadow border" style={{ borderColor: theme.colors.borderLight }}>
-            <label className="text-sm md:text-base font-medium mb-2 block" style={{ color: theme.colors.textSecondary }}>
-              Write Your Review
-            </label>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows={5}
-              className="w-full px-3 md:px-4 py-2 md:py-2.5 rounded-lg md:rounded-xl bg-white border text-sm md:text-base focus:outline-none transition-colors resize-none"
-              style={{ 
-                borderColor: theme.colors.borderDefault,
-                color: theme.colors.textPrimary,
-              }}
-              onFocus={(e) => e.target.style.borderColor = theme.colors.primary}
-              onBlur={(e) => e.target.style.borderColor = theme.colors.borderDefault}
-              placeholder="Share your experience with this car rental..."
-              required
-            />
-            <p className="text-xs md:text-sm mt-1" style={{ color: theme.colors.textSecondary }}>
-              {comment.length} characters
-            </p>
-          </div>
-        </div>
-
-        {/* Submit Button - Fixed Bottom */}
-        <div className="fixed bottom-0 left-0 right-0 border-t-2 border-white/20 px-4 md:px-6 py-4 md:py-5 z-50 shadow-2xl" style={{ backgroundColor: theme.colors.primary }}>
-          <div className="max-w-4xl mx-auto">
-            <button
-              type="submit"
-              disabled={isSubmitting || tripRating === 0 || !comment.trim()}
-              className="w-full md:w-auto md:max-w-xs md:mx-auto block py-3 md:py-3.5 px-6 md:px-8 rounded-lg md:rounded-xl font-bold text-sm md:text-base shadow-xl touch-target active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: '#ffffff',
-                color: theme.colors.primary,
-                boxShadow: '0 4px 14px 0 rgba(255, 255, 255, 0.3)',
-              }}
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Review'}
-            </button>
-          </div>
-        </div>
-      </form>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-md disabled:opacity-50"
+          >
+            {isSubmitting ? 'Submitting Review...' : 'Submit Review'}
+          </button>
+        </form>
+      </main>
     </div>
   );
 };
 
 export default ReviewFormPage;
-

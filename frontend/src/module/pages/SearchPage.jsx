@@ -13,31 +13,9 @@ import { carService } from '../../services/car.service';
 import { commonService } from '../../services/common.service';
 import { useLocation } from '../../hooks/useLocation';
 
-// Import car images
-import carImg1 from '../../assets/car_img1-removebg-preview.png';
-import carImg4 from '../../assets/car_img4-removebg-preview.png';
-import carImg5 from '../../assets/car_img5-removebg-preview.png';
-import carImg6 from '../../assets/car_img6-removebg-preview.png';
-import carImg8 from '../../assets/car_img8.png';
+// Default car placeholder image
+import defaultCarImg from '../../assets/car_img1-removebg-preview.png';
 
-// Import brand logos
-import logo1 from '../../assets/car_logo1_PNG1.png';
-import logo2 from '../../assets/car_logo2_PNG.png';
-import logo3 from '../../assets/car_logo3_PNG.png';
-import logo4 from '../../assets/car_logo4_PNG.png';
-import logo5 from '../../assets/car_logo5_PNG.png';
-import logo6 from '../../assets/car_logo6_PNG.png';
-import logo7 from '../../assets/car_logo7_PNG.png';
-import logo8 from '../../assets/car_logo8_PNG.png';
-import logo9 from '../../assets/car_logo9_PNG.png';
-import logo10 from '../../assets/car_logo10_PNG.png';
-import logo11 from '../../assets/car_logo11_PNG.png';
-import logo13 from '../../assets/car_logo13_PNG.png';
-import logo14 from '../../assets/car_logo14_PNG.png';
-import logo15 from '../../assets/car_logo15.png';
-import logo16 from '../../assets/car_logo16.png';
-
-const fallbackCarImages = [carImg1, carImg6, carImg8, carImg4, carImg5];
 
 // Shimmer Skeleton Loader for Car Card
 const CarCardSkeleton = () => (
@@ -330,8 +308,8 @@ const SearchPage = () => {
   const norm = (val) => (val || '').toString().toLowerCase().trim();
 
   // Transform API car data to SearchCarCard format
-  const transformCarData = (car, index = 0) => {
-    let carImage = fallbackCarImages[index % fallbackCarImages.length];
+  const transformCarData = (car) => {
+    let carImage = defaultCarImg;
     let carImages = [];
 
     if (car.images && car.images.length > 0) {
@@ -505,10 +483,7 @@ const SearchPage = () => {
                 brandLogo = brandKey ? brandLogos[brandKey] : null;
               }
 
-              // Use fallback brand logo if still not found
-              if (!brandLogo) {
-                brandLogo = fallbackBrandLogos[idx % fallbackBrandLogos.length];
-              }
+              // Brand logo will be null if no matched logo
             }
           }
 
