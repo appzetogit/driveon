@@ -14,8 +14,6 @@ const AdminNotificationsPage = () => {
   const [selectedRole, setSelectedRole] = useState('Customer');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
   const [sending, setSending] = useState(false);
 
   // State for History Logs
@@ -82,52 +80,6 @@ const AdminNotificationsPage = () => {
     }
   };
 
-  // Image Selection Handler
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toastUtils.error('Image size must be less than 5MB');
-        return;
-      }
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLightboxImage(null);
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Drag and Drop handlers
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toastUtils.error('Image size must be less than 5MB');
-        return;
-      }
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLightboxImage(null);
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeSelectedImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-  };
-
   // Form Submission
   const handleSendNotification = async (e) => {
     e.preventDefault();
@@ -146,9 +98,6 @@ const AdminNotificationsPage = () => {
       formData.append('role', selectedRole);
       formData.append('title', title.trim());
       formData.append('message', message.trim());
-      if (imageFile) {
-        formData.append('image', imageFile);
-      }
 
       const response = await adminService.sendRoleNotification(formData);
       if (response.success) {
@@ -156,8 +105,6 @@ const AdminNotificationsPage = () => {
         // Reset form
         setTitle('');
         setMessage('');
-        setImageFile(null);
-        setImagePreview(null);
       } else {
         toastUtils.error(response.message || 'Failed to send notification');
       }
@@ -234,10 +181,10 @@ const AdminNotificationsPage = () => {
 
         {/* Tab Content */}
         {activeTab === 'send' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="max-w-4xl">
 
             {/* Main Form */}
-            <Card className="p-6 lg:col-span-2">
+            <Card className="p-6">
               <h2 className="text-xl font-semibold mb-6" style={{ color: colors.textPrimary }}>
                 Compose Notification Broadcast
               </h2>
@@ -332,69 +279,6 @@ const AdminNotificationsPage = () => {
                   </button>
                 </div>
               </form>
-            </Card>
-
-            {/* Image Attachment Panel */}
-            <Card className="p-6 flex flex-col justify-between">
-              <div>
-                <h3 className="text-lg font-semibold mb-4" style={{ color: colors.textPrimary }}>
-                  Image Attachment (Optional)
-                </h3>
-
-                {/* Drag and Drop Box */}
-                {!imagePreview ? (
-                  <div
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all min-h-[220px]"
-                    style={{
-                      borderColor: colors.borderMedium,
-                      backgroundColor: colors.backgroundSecondary
-                    }}
-                    onClick={() => document.getElementById('imageFileInput').click()}
-                  >
-                    <svg className="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-sm font-semibold mb-1" style={{ color: colors.textPrimary }}>
-                      Drag and drop image here
-                    </p>
-                    <p className="text-xs text-gray-400 mb-2">or click to browse local files</p>
-                    <p className="text-[10px] text-gray-500">Supports PNG, JPG, JPEG (Max 5MB)</p>
-                    <input
-                      type="file"
-                      id="imageFileInput"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                    />
-                  </div>
-                ) : (
-                  <div className="relative rounded-lg overflow-hidden border" style={{ borderColor: colors.borderMedium }}>
-                    <img
-                      src={imagePreview}
-                      alt="Selected upload preview"
-                      className="w-full h-auto max-h-[300px] object-contain bg-black/10"
-                    />
-                    <button
-                      type="button"
-                      onClick={removeSelectedImage}
-                      className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white rounded-full transition-all"
-                      title="Remove image"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Preview Tips */}
-              <div className="mt-6 text-xs text-gray-500 bg-gray-50/5 p-4 rounded-lg border border-gray-100/10">
-                <h4 className="font-semibold mb-1" style={{ color: colors.textPrimary }}>Important Note</h4>
-                <p>Notifications are broadcasted to all staff members with the selected role. Images uploaded are compressed automatically and stored securely on Cloudinary before broadcast.</p>
-              </div>
             </Card>
           </div>
         ) : (
