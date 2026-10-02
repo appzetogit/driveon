@@ -9,31 +9,49 @@ import { Button, Input } from '../../../components/common';
 import { adminService } from '../../../services/admin.service';
 import toastUtils from '../../../config/toast';
 import AdminCustomSelect from '../../../components/admin/common/AdminCustomSelect';
+import VendorOwnerFields from './VendorOwnerFields';
 
 // Form validation schema (same as AddCarPage)
+// Helpers for numeric fields to handle empty strings and NaN from react-hook-form valueAsNumber
+const optionalNumber = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && isNaN(v)) ? undefined : Number(v)),
+  z.number().min(0, 'Must be a positive number').optional()
+);
+
+const requiredNumber = (min = 0, message = 'Value is required') =>
+  z.preprocess(
+    (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && isNaN(v)) ? undefined : Number(v)),
+    z.number({ required_error: message, invalid_type_error: message }).min(min, message)
+  );
+
+// Form validation schema
 const carFormSchema = z.object({
   // Basic Information
   brand: z.string().min(1, 'Brand is required'),
   model: z.string().min(1, 'Model is required'),
-  year: z.number().min(1900).max(new Date().getFullYear() + 1),
+  year: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && isNaN(v)) ? undefined : Number(v)),
+    z.number({ required_error: 'Valid manufacturing year is required', invalid_type_error: 'Valid manufacturing year is required' })
+      .min(1900, 'Year must be 1900 or later')
+      .max(new Date().getFullYear() + 1, 'Year cannot be in the future')
+  ),
   color: z.string().optional(),
   registrationNumber: z.string()
     .min(1, 'Registration number is required')
-    .regex(/^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$/, {
-      message: 'Invalid registration number format. E.g., MP41HG5263'
-    }),
+    .min(4, 'Registration number must be at least 4 characters')
+    .max(15, 'Registration number too long'),
 
   // Car Type & Category
   carType: z.enum(['sedan', 'suv', 'hatchback', 'luxury', 'sports', 'compact', 'muv', 'coupe']),
   fuelType: z.enum(['petrol', 'diesel', 'electric', 'hybrid', 'cng', 'petrol_cng']),
   transmission: z.enum(['manual', 'automatic', 'cvt']),
-  seatingCapacity: z.number().min(2).max(10),
+  seatingCapacity: requiredNumber(2, 'Seating capacity must be at least 2'),
 
   // Pricing
-  pricePerDay: z.number().min(0, 'Price must be positive'),
-  pricePerWeek: z.number().min(0).optional(),
-  pricePerMonth: z.number().min(0).optional(),
-  securityDeposit: z.number().min(0, 'Security deposit must be positive'),
+  pricePerDay: requiredNumber(0, 'Price per day is required and must be positive'),
+  pricePerWeek: optionalNumber,
+  pricePerMonth: optionalNumber,
+  securityDeposit: optionalNumber.default(0),
 
   // Location
   city: z.string().min(1, 'City is required'),
@@ -42,7 +60,7 @@ const carFormSchema = z.object({
 
   // Additional
   description: z.string().max(1000).optional(),
-  mileage: z.number().min(0).optional(),
+  mileage: optionalNumber,
   engineCapacity: z.string().optional(),
   ownerName: z.string().min(1, 'Owner name is required'),
   ownerEmail: z.string().email('Invalid email address').min(1, 'Owner email is required'),
@@ -50,10 +68,18 @@ const carFormSchema = z.object({
   isAvailable: z.boolean().default(true),
 });
 
+// Vendor (outward) cars take owner details from the selected vendor
+const vendorCarFormSchema = carFormSchema.extend({
+  ownerName: z.string().optional(),
+  ownerEmail: z.preprocess((v) => (v === '' ? undefined : v), z.string().email('Invalid email address').optional()),
+  ownerId: z.string().optional(),
+});
+
 const EditCarPage = () => {
   const navigate = useNavigate();
   const { carId } = useParams();
   const [loading, setLoading] = useState(false);
+  const [vendorInfo, setVendorInfo] = useState(null); // set only for vendor (outward) cars
   const [fetching, setFetching] = useState(true);
   const [existingImages, setExistingImages] = useState([]); // Images from database
   const [newImages, setNewImages] = useState([]); // New images to upload
@@ -69,7 +95,8 @@ const EditCarPage = () => {
     setValue,
     reset,
   } = useForm({
-    resolver: zodResolver(carFormSchema),
+    resolver: (...args) =>
+      zodResolver(vendorInfo ? vendorCarFormSchema : carFormSchema)(...args),
     mode: 'onTouched',
     defaultValues: {
       isAvailable: true,
@@ -112,7 +139,7 @@ const EditCarPage = () => {
             pricePerDay: car.pricePerDay,
             pricePerWeek: car.pricePerWeek || '',
             pricePerMonth: car.pricePerMonth || '',
-            securityDeposit: car.securityDeposit,
+            securityDeposit: car.securityDeposit ?? 0,
             city: car.location?.city || '',
             state: car.location?.state || '',
             address: car.location?.address || '',
@@ -124,6 +151,16 @@ const EditCarPage = () => {
             ownerId: car.ownerInfo?.ownerId || `OWNR-${Math.floor(100000 + Math.random() * 900000)}`,
             isAvailable: car.isAvailable !== undefined ? car.isAvailable : true,
           });
+
+          if (car.source === 'outward') {
+            const outward = response.data.outward || {};
+            setVendorInfo({
+              vendorId: outward.vendorId || '',
+              vendorAgreementType: outward.vendorAgreementType || 'daily',
+              agreementPricePerDay: outward.agreementPricePerDay || '',
+              agreementPricePerMonth: outward.agreementPricePerMonth || '',
+            });
+          }
 
           // Set existing images
           setExistingImages(car.images || []);
@@ -203,6 +240,12 @@ const EditCarPage = () => {
         return;
       }
 
+      if (vendorInfo && !vendorInfo.vendorId) {
+        toastUtils.error('Please select a vendor');
+        setLoading(false);
+        return;
+      }
+
       // Create FormData for file uploads
       const formData = new FormData();
 
@@ -219,7 +262,7 @@ const EditCarPage = () => {
       formData.append('pricePerDay', data.pricePerDay);
       if (data.pricePerWeek) formData.append('pricePerWeek', data.pricePerWeek);
       if (data.pricePerMonth) formData.append('pricePerMonth', data.pricePerMonth);
-      formData.append('securityDeposit', data.securityDeposit);
+      formData.append('securityDeposit', data.securityDeposit !== undefined && data.securityDeposit !== null ? data.securityDeposit : 0);
 
       // Add location fields
       formData.append('location[city]', data.city || '');
@@ -241,11 +284,14 @@ const EditCarPage = () => {
       formData.append('ownerName', data.ownerName || '');
       formData.append('ownerEmail', data.ownerEmail || '');
       formData.append('ownerId', data.ownerId || '');
+      if (vendorInfo) {
+        Object.entries(vendorInfo).forEach(([key, value]) => formData.append(key, value));
+      }
 
       formData.append('isAvailable', data.isAvailable ? 'true' : 'false');
 
-      // Add existing image public IDs (images to keep)
-      const existingImagePublicIds = existingImages.map(img => img.publicId || img.public_id).filter(Boolean);
+      // Add existing image public IDs (images to keep); older outward car images only have a url
+      const existingImagePublicIds = existingImages.map(img => img.publicId || img.public_id || img.url).filter(Boolean);
       formData.append('existingImagePublicIds', JSON.stringify(existingImagePublicIds));
 
       // Add new images
@@ -292,9 +338,17 @@ const EditCarPage = () => {
     );
   }
 
+  const onValidationError = (formErrors) => {
+    console.error('❌ Validation errors in EditCar form:', formErrors);
+    const firstKey = Object.keys(formErrors)[0];
+    if (firstKey) {
+      toastUtils.error(formErrors[firstKey]?.message || `Please check ${firstKey}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 pt-20 pb-6 md:px-6 md:pt-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 pt-20 pb-8 md:px-6 md:pt-6 lg:px-8">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
@@ -314,51 +368,59 @@ const EditCarPage = () => {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit, onValidationError)}>
           <div className="space-y-6">
             {/* Basic Information */}
             <Card className="p-4 md:p-6">
               <h2 className="text-lg font-semibold mb-4" style={{ color: colors.backgroundTertiary }}>
                 Basic Information
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
                 <Input
                   label="Brand *"
-                  placeholder="e.g., Toyota"
+                  placeholder="Enter car brand (e.g., Toyota)"
                   error={errors.brand?.message}
                   {...register('brand')}
                 />
                 <Input
                   label="Model *"
-                  placeholder="e.g., Camry"
+                  placeholder="Enter car model (e.g., Camry)"
                   error={errors.model?.message}
                   {...register('model')}
                 />
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
                   label="Year *"
-                  placeholder="e.g., 2023"
+                  placeholder="Enter manufacturing year (e.g., 2023)"
                   error={errors.year?.message}
-                  {...register('year', { valueAsNumber: true })}
+                  {...register('year', {
+                    onChange: (e) => {
+                      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    }
+                  })}
                 />
                 <Input
                   label="Color"
-                  placeholder="e.g., White"
+                  placeholder="Enter car color (e.g., White)"
                   error={errors.color?.message}
                   {...register('color')}
                 />
-                <Input
-                  label="Registration Number *"
-                  placeholder="e.g., MH01AB1234"
-                  error={errors.registrationNumber?.message}
-                  {...register('registrationNumber', {
-                    onChange: (e) => {
-                      // Convert to uppercase and strip non-alphanumeric characters
-                      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                    }
-                  })}
-                  className="uppercase"
-                />
+                <div className="md:col-span-2 lg:col-span-2">
+                  <Input
+                    label="Registration Number *"
+                    placeholder="Enter registration number (e.g., MH01AB1234)"
+                    error={errors.registrationNumber?.message}
+                    {...register('registrationNumber', {
+                      onChange: (e) => {
+                        // Convert to uppercase and strip non-alphanumeric characters
+                        e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                      }
+                    })}
+                    className="uppercase"
+                  />
+                </div>
               </div>
             </Card>
 
@@ -367,27 +429,31 @@ const EditCarPage = () => {
               <h2 className="text-lg font-semibold mb-4" style={{ color: colors.backgroundTertiary }}>
                 Owner Information
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Owner Name *"
-                  placeholder="e.g., John Doe"
-                  error={errors.ownerName?.message}
-                  {...register('ownerName')}
-                />
-                <Input
-                  label="Owner Email *"
-                  placeholder="e.g., john@example.com"
-                  error={errors.ownerEmail?.message}
-                  {...register('ownerEmail')}
-                />
-                <Input
-                  label="Owner ID *"
-                  placeholder="Owner ID"
-                  error={errors.ownerId?.message}
-                  {...register('ownerId')}
-                  helperText="You can update the Owner ID if needed"
-                />
-              </div>
+              {vendorInfo ? (
+                <VendorOwnerFields value={vendorInfo} onChange={setVendorInfo} />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+                  <Input
+                    label="Owner Name *"
+                    placeholder="Enter owner full name (e.g., John Doe)"
+                    error={errors.ownerName?.message}
+                    {...register('ownerName')}
+                  />
+                  <Input
+                    label="Owner Email *"
+                    placeholder="Enter owner email (e.g., john@example.com)"
+                    error={errors.ownerEmail?.message}
+                    {...register('ownerEmail')}
+                  />
+                  <Input
+                    label="Owner ID *"
+                    placeholder="Enter or edit Owner ID"
+                    error={errors.ownerId?.message}
+                    {...register('ownerId')}
+                    helperText="You can update the Owner ID if needed"
+                  />
+                </div>
+              )}
             </Card>
 
             {/* Car Type & Specifications */}
@@ -395,7 +461,7 @@ const EditCarPage = () => {
               <h2 className="text-lg font-semibold mb-4" style={{ color: colors.backgroundTertiary }}>
                 Car Type & Specifications
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
                 <div>
                   <Controller
                     name="carType"
@@ -403,6 +469,7 @@ const EditCarPage = () => {
                     render={({ field }) => (
                       <AdminCustomSelect
                         label="Car Type *"
+                        placeholder="Select car type"
                         value={field.value}
                         onChange={field.onChange}
                         options={[
@@ -427,6 +494,7 @@ const EditCarPage = () => {
                     render={({ field }) => (
                       <AdminCustomSelect
                         label="Fuel Type *"
+                        placeholder="Select fuel type"
                         value={field.value}
                         onChange={field.onChange}
                         options={[
@@ -449,6 +517,7 @@ const EditCarPage = () => {
                     render={({ field }) => (
                       <AdminCustomSelect
                         label="Transmission *"
+                        placeholder="Select transmission"
                         value={field.value}
                         onChange={field.onChange}
                         options={[
@@ -464,20 +533,20 @@ const EditCarPage = () => {
                 <Input
                   type="number"
                   label="Seating Capacity *"
-                  placeholder="e.g., 5"
+                  placeholder="Enter seating capacity (e.g., 5)"
                   error={errors.seatingCapacity?.message}
                   {...register('seatingCapacity', { valueAsNumber: true })}
                 />
                 <Input
                   type="number"
                   label="Mileage (km)"
-                  placeholder="e.g., 15000"
+                  placeholder="Enter mileage in km (e.g., 15000)"
                   error={errors.mileage?.message}
                   {...register('mileage', { valueAsNumber: true })}
                 />
                 <Input
                   label="Engine Capacity"
-                  placeholder="e.g., 1.5L"
+                  placeholder="Enter engine capacity (e.g., 1.5L or 1498cc)"
                   error={errors.engineCapacity?.message}
                   {...register('engineCapacity')}
                 />
@@ -489,34 +558,27 @@ const EditCarPage = () => {
               <h2 className="text-lg font-semibold mb-4" style={{ color: colors.backgroundTertiary }}>
                 Pricing
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-5">
                 <Input
                   type="number"
                   label="Price Per Day (₹) *"
-                  placeholder="e.g., 1500"
+                  placeholder="Enter price per day (e.g., 1500)"
                   error={errors.pricePerDay?.message}
                   {...register('pricePerDay', { valueAsNumber: true })}
                 />
                 <Input
                   type="number"
                   label="Price Per Week (₹)"
-                  placeholder="e.g., 10000"
+                  placeholder="Enter price per week (e.g., 10000)"
                   error={errors.pricePerWeek?.message}
                   {...register('pricePerWeek', { valueAsNumber: true })}
                 />
                 <Input
                   type="number"
                   label="Price Per Month (₹)"
-                  placeholder="e.g., 40000"
+                  placeholder="Enter price per month (e.g., 40000)"
                   error={errors.pricePerMonth?.message}
                   {...register('pricePerMonth', { valueAsNumber: true })}
-                />
-                <Input
-                  type="number"
-                  label="Security Deposit (₹) *"
-                  placeholder="e.g., 5000"
-                  error={errors.securityDeposit?.message}
-                  {...register('securityDeposit', { valueAsNumber: true })}
                 />
               </div>
             </Card>
@@ -526,23 +588,23 @@ const EditCarPage = () => {
               <h2 className="text-lg font-semibold mb-4" style={{ color: colors.backgroundTertiary }}>
                 Location
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
                 <Input
                   label="City *"
-                  placeholder="e.g., Mumbai"
+                  placeholder="Enter city (e.g., Mumbai)"
                   error={errors.city?.message}
                   {...register('city')}
                 />
                 <Input
                   label="State"
-                  placeholder="e.g., Maharashtra"
+                  placeholder="Enter state (e.g., Maharashtra)"
                   error={errors.state?.message}
                   {...register('state')}
                 />
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 lg:col-span-3">
                   <Input
                     label="Address"
-                    placeholder="Full address"
+                    placeholder="Enter complete address (Street, Area, Landmark)"
                     error={errors.address?.message}
                     {...register('address')}
                   />
@@ -555,7 +617,7 @@ const EditCarPage = () => {
               <h2 className="text-lg font-semibold mb-4" style={{ color: colors.backgroundTertiary }}>
                 Features
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {availableFeatures.map((feature) => (
                   <label key={feature} className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -581,7 +643,7 @@ const EditCarPage = () => {
               {existingImages.length > 0 && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Existing Images (Click to remove)</label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {existingImages.map((image, index) => (
                       <div key={index} className="relative group">
                         <img
@@ -629,7 +691,7 @@ const EditCarPage = () => {
                 {newImages.length > 0 && (
                   <div className="mt-4">
                     <p className="text-sm text-gray-600 mb-2">{newImages.length} new image(s) selected</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                       {newImages.map((image, index) => (
                         <div key={index} className="relative">
                           <img
@@ -706,7 +768,7 @@ const EditCarPage = () => {
                   <textarea
                     {...register('description')}
                     rows={4}
-                    placeholder="Describe the car, its condition, special features, etc."
+                    placeholder="Enter car description (condition, key features, pickup instructions, etc.)"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description.message}</p>}

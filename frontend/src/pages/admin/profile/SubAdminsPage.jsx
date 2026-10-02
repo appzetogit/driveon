@@ -11,7 +11,6 @@ const ADMIN_PERMISSIONS_LIST = [
   { id: 'users', label: 'Users' },
   { id: 'guarantors', label: 'Guarantors' },
   { id: 'cars', label: 'Cars' },
-  { id: 'add-outward-car', label: 'Add Outward Car' },
   { id: 'online-cars', label: 'Online Booking Cars' },
   { id: 'fleet-inward', label: 'Fleet: Inward Cars' },
   { id: 'fleet-inward-bookings', label: 'Fleet: Inward Bookings' },

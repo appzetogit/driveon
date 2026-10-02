@@ -154,6 +154,8 @@ const CarListPage = () => {
             .filter(c => c.isInActiveRepair)
             .map(c => (c.registrationNumber || '').toUpperCase().trim())
         );
+        // Outward cars are edited through their Car document
+        const carDocIdByOutwardId = new Map(standardOutwardCars.map(c => [c.outwardCarId, c._id || c.id]));
 
         const outwardCars = (Array.isArray(outwardRes.data.data) ? outwardRes.data.data : []).map((car) => {
           const reg = (car.carNumber || car.registrationNumber || '').toUpperCase().trim();
@@ -164,6 +166,7 @@ const CarListPage = () => {
 
           return {
             id: outwardId,
+            carDocId: carDocIdByOutwardId.get(outwardId),
             brand: car.brand || '',
             model: car.model || '',
             year: car.year || '',
@@ -351,7 +354,11 @@ const CarListPage = () => {
   const handleDelete = async (carId) => {
     if (window.confirm('Are you sure you want to delete this car listing?')) {
       try {
-        const response = await adminService.deleteCar(carId);
+        // Outward cars are removed with their fleet record (which also deletes the Car document)
+        const isOutward = cars.find(c => c.id === carId)?.source === 'outward';
+        const response = isOutward
+          ? (await api.delete(`/fleet/outward-cars/${carId}`)).data
+          : await adminService.deleteCar(carId);
         if (response.success) {
           toastUtils.success('Car deleted successfully');
           await refreshCarsList();
@@ -386,11 +393,12 @@ const CarListPage = () => {
   };
 
   const handleEditCar = (car) => {
-    if (car.source === 'outward') {
-      navigate('/admin/cars/add-outward', { state: { editCarId: car.id } });
-    } else {
-      navigate(`/admin/cars/${car.id}/edit`);
+    const carDocId = car.source === 'outward' ? car.carDocId : car.id;
+    if (!carDocId) {
+      toastUtils.error('Car record not found for this outward car');
+      return;
     }
+    navigate(`/admin/cars/${carDocId}/edit`);
   };
 
   // Get status badge color

@@ -5,6 +5,39 @@ import RepairJob from '../models/RepairJob.js';
 import { uploadImage, deleteImage } from '../services/cloudinary.service.js';
 import mongoose from 'mongoose';
 import OutwardBooking from '../models/OutwardBooking.js';
+import OutwardCar from '../models/OutwardCar.js';
+import Vendor from '../models/Vendor.js';
+
+// Vendor-owned cars are "outward" cars: Fleet and CRM vendor profitability read the
+// OutwardCar collection, so keep that record in sync with the full Car document.
+const upsertOutwardFromCar = (car, vendor, body) => {
+  const primaryImage = car.images?.find(img => img.isPrimary) || car.images?.[0];
+  return OutwardCar.findOneAndUpdate(
+    { originalOutputId: car.outwardCarId },
+    {
+      name: `${car.brand} ${car.model}`,
+      brand: car.brand,
+      model: car.model,
+      pricePerDay: car.pricePerDay,
+      vendorAgreementType: body.vendorAgreementType === 'monthly' ? 'monthly' : 'daily',
+      agreementPricePerDay: Number(body.agreementPricePerDay) || 0,
+      agreementPricePerMonth: Number(body.agreementPricePerMonth) || 0,
+      location: car.location?.city,
+      type: 'OUTWARD',
+      ownerName: vendor.name,
+      ownerPhone: vendor.phone,
+      image: primaryImage?.url || '',
+      carNumber: car.registrationNumber,
+      registrationNumber: car.registrationNumber,
+      features: car.features || [],
+      vendorId: vendor._id,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+};
+
+const findVendor = (vendorId) =>
+  mongoose.isValidObjectId(vendorId) ? Vendor.findById(vendorId) : null;
 
 /**
  * @desc    Get All Cars (Admin)
@@ -265,6 +298,8 @@ export const createCar = async (req, res) => {
       ownerEmail,
       ownerId,
       isAvailable,
+      ownerType,
+      vendorId,
     } = req.body;
 
     // Owner is not provided in form, so use admin ID as owner
@@ -316,7 +351,6 @@ export const createCar = async (req, res) => {
     if (!transmission || transmission.trim() === '') missingFields.push('transmission');
     if (!seatingCapacity || seatingCapacity === '' || isNaN(seatingCapacity)) missingFields.push('seatingCapacity');
     if (!pricePerDay || pricePerDay === '' || isNaN(pricePerDay)) missingFields.push('pricePerDay');
-    if (!securityDeposit || securityDeposit === '' || isNaN(securityDeposit)) missingFields.push('securityDeposit');
     if (!location?.city || location.city.trim() === '') missingFields.push('location.city');
 
     if (missingFields.length > 0) {
@@ -340,6 +374,18 @@ export const createCar = async (req, res) => {
         success: false,
         message: 'Car with this registration number already exists',
       });
+    }
+
+    // "By Vendor" cars are linked to a CRM vendor
+    let vendor = null;
+    if (ownerType === 'vendor') {
+      vendor = await findVendor(vendorId);
+      if (!vendor) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select a valid vendor',
+        });
+      }
     }
 
     // Owner is set to admin ID (admin is adding the car)
@@ -430,7 +476,7 @@ export const createCar = async (req, res) => {
       pricePerDay: parseFloat(pricePerDay),
       pricePerWeek: pricePerWeek ? parseFloat(pricePerWeek) : undefined,
       pricePerMonth: pricePerMonth ? parseFloat(pricePerMonth) : undefined,
-      securityDeposit: parseFloat(securityDeposit),
+      securityDeposit: securityDeposit ? parseFloat(securityDeposit) : 0,
       location: {
         city: location.city.trim(),
         state: location.state?.trim(),
@@ -444,16 +490,30 @@ export const createCar = async (req, res) => {
       mileage: mileage ? parseFloat(mileage) : undefined,
       engineCapacity: engineCapacity?.trim(),
       isAvailable: isAvailable !== undefined ? (isAvailable === 'true' || isAvailable === true) : true,
-      status: 'pending', // New cars start as pending
+      status: vendor ? 'active' : 'pending', // New cars start as pending; vendor (outward) cars go live like before
       rcDocument,
       ownerInfo: {
-        name: ownerName?.trim(),
-        email: ownerEmail?.trim(),
+        name: vendor ? vendor.name : ownerName?.trim(),
+        email: vendor ? vendor.email : ownerEmail?.trim(),
         ownerId: ownerId?.trim(),
       },
+      ...(vendor && {
+        source: 'outward',
+        outwardCarId: `fleet_car_out_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      }),
     };
 
     const car = await Car.create(carData);
+
+    if (vendor) {
+      try {
+        await upsertOutwardFromCar(car, vendor, req.body);
+      } catch (error) {
+        // Don't leave a vendor car without its outward record
+        await Car.findByIdAndDelete(car._id);
+        throw error;
+      }
+    }
 
     // Populate owner data
     await car.populate('owner', 'name email phone profilePhoto');
@@ -511,9 +571,16 @@ export const getCarById = async (req, res) => {
       });
     }
 
+    // Vendor + agreement details for outward cars (used by the edit form)
+    const outward = car.source === 'outward'
+      ? await OutwardCar.findOne({ originalOutputId: car.outwardCarId })
+        .select('vendorId vendorAgreementType agreementPricePerDay agreementPricePerMonth')
+        .lean()
+      : null;
+
     res.status(200).json({
       success: true,
-      data: { car },
+      data: { car, outward },
     });
   } catch (error) {
     console.error('Get car by ID (admin) error:', error);
@@ -592,6 +659,18 @@ export const updateCar = async (req, res) => {
       });
     }
 
+    // Outward cars stay linked to a CRM vendor
+    let vendor = null;
+    if (car.source === 'outward' && req.body.vendorId) {
+      vendor = await findVendor(req.body.vendorId);
+      if (!vendor) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select a valid vendor',
+        });
+      }
+    }
+
     // Check if registration number is being changed and if it already exists
     if (registrationNumber && registrationNumber.toUpperCase() !== car.registrationNumber) {
       const existingCar = await Car.findOne({
@@ -615,7 +694,8 @@ export const updateCar = async (req, res) => {
 
     const imagesToKeep = [];
     for (const img of car.images || []) {
-      if (existingImagePublicIds.includes(img.publicId)) {
+      // Older outward car images have no publicId, so they are matched by url
+      if (existingImagePublicIds.includes(img.publicId || img.url)) {
         imagesToKeep.push(img);
       } else {
         // Delete from Cloudinary
@@ -718,7 +798,13 @@ export const updateCar = async (req, res) => {
     if (isAvailable !== undefined) car.isAvailable = isAvailable === 'true' || isAvailable === true;
 
     // Update owner info
-    if (ownerName !== undefined || ownerEmail !== undefined || ownerId !== undefined) {
+    if (vendor) {
+      car.ownerInfo = {
+        name: vendor.name,
+        email: vendor.email,
+        ownerId: car.ownerInfo?.ownerId,
+      };
+    } else if (ownerName !== undefined || ownerEmail !== undefined || ownerId !== undefined) {
       car.ownerInfo = {
         name: ownerName !== undefined ? ownerName?.trim() : car.ownerInfo?.name,
         email: ownerEmail !== undefined ? ownerEmail?.trim() : car.ownerInfo?.email,
@@ -727,6 +813,10 @@ export const updateCar = async (req, res) => {
     }
 
     await car.save();
+
+    if (vendor) {
+      await upsertOutwardFromCar(car, vendor, req.body);
+    }
 
     // Populate owner data
     await car.populate('owner', 'name email phone profilePhoto');

@@ -100,9 +100,6 @@ const CarListPage = lazy(() =>
 const AddCarPage = lazy(() =>
   import("../pages/admin/cars/AddCarPage")
 );
-const AddOutwardCarPage = lazy(() =>
-  import("../pages/admin/cars/AddOutwardCarPage")
-);
 const EditCarPage = lazy(() =>
   import("../pages/admin/cars/EditCarPage")
 );
@@ -645,10 +642,6 @@ const router = createBrowserRouter([
           {
             path: "/admin/cars/new",
             element: <AddCarPage />,
-          },
-          {
-            path: "/admin/cars/add-outward",
-            element: <AddOutwardCarPage />,
           },
           {
             path: "/admin/cars/:carId/edit",

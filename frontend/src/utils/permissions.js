@@ -2,7 +2,6 @@ const adminPathMap = [
   { path: '/admin/dashboard', key: 'admin:dashboard' },
   { path: '/admin/users', key: 'admin:users' },
   { path: '/admin/guarantors', key: 'admin:guarantors' },
-  { path: '/admin/cars/add-outward', key: 'admin:add-outward-car' },
   { path: '/admin/cars', key: 'admin:cars' },
   { path: '/admin/online-cars', key: 'admin:online-cars' },
   { path: '/admin/fleet/inward-bookings', key: 'admin:fleet-inward-bookings' },

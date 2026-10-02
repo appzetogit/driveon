@@ -211,7 +211,7 @@ const AdminDashboardPage = () => {
       color: colors.warning,
       change: '',
       changeType: 'neutral',
-      onClick: () => navigate('/admin/cars/add-outward'),
+      onClick: () => navigate('/admin/cars'),
     },
     {
       title: 'Pending Bookings',
