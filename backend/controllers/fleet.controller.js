@@ -356,11 +356,15 @@ export const deleteOutwardCar = async (req, res) => {
 // Get all Outward Bookings
 export const getOutwardBookings = async (req, res) => {
     try {
-        const bookings = await OutwardBooking.find().sort({ createdAt: -1 });
+        const bookings = await OutwardBooking.find()
+            .populate('guarantor', 'name phone email guarantorId kycStatus')
+            .sort({ createdAt: -1 });
         
         // Map backend to frontend expected structure
         const formattedBookings = bookings.map(b => ({
             id: b.originalBookingId,
+            mongoId: b._id?.toString(),
+            _id: b._id?.toString(),
             carId: b.carId,
             carName: b.carName,
             carType: b.carType,
@@ -368,6 +372,8 @@ export const getOutwardBookings = async (req, res) => {
             customerName: b.customerName,
             customerPhone: b.customerPhone || '',
             customerEmail: b.customerEmail || '',
+            customerAddress: b.customerAddress || '',
+            numberOfGuests: b.numberOfGuests || 1,
             customerImage: b.customerImage,
             licenseImage: b.licenseImage,
             aadhaarImage: b.aadhaarImage,
@@ -398,6 +404,8 @@ export const getOutwardBookings = async (req, res) => {
             remainingCashCollector: b.remainingCashCollector || '',
             status: b.status || 'active',
             agreement: b.agreement || null,
+            guarantor: b.guarantor || null,
+            guarantorDetails: b.guarantorDetails || null,
             createdAt: b.createdAt
         }));
 
@@ -450,8 +458,8 @@ export const createOutwardBooking = async (req, res) => {
             const itemImageSecure = await uploadToCloudinaryIfBase64(bookingData.depositItem.itemImage, 'deposit-items');
             depositItemData = {
                 itemType: bookingData.depositItem.itemType || 'Bike / Two-Wheeler',
-                itemName: bookingData.depositItem.itemName || '',
-                itemNumber: bookingData.depositItem.itemNumber || '',
+                itemName: bookingData.depositItem.itemName || bookingData.depositItemName || '',
+                itemNumber: bookingData.depositItem.itemNumber || bookingData.depositItem.number || bookingData.depositItemNumber || '',
                 itemDetails: bookingData.depositItem.itemDetails || '',
                 itemImage: itemImageSecure || '',
                 returnStatus: bookingData.depositItem.returnStatus || 'deposited',
@@ -480,6 +488,8 @@ export const createOutwardBooking = async (req, res) => {
             customerName: bookingData.customerName,
             customerPhone: bookingData.customerPhone || '',
             customerEmail: bookingData.customerEmail || '',
+            customerAddress: bookingData.customerAddress || bookingData.address || '',
+            numberOfGuests: Number(bookingData.numberOfGuests) || 1,
             customerImage: customerImageSecure,
             licenseImage: licenseImageSecure,
             aadhaarImage: aadhaarImageSecure,
@@ -533,6 +543,8 @@ export const createOutwardBooking = async (req, res) => {
             customerName: newBooking.customerName,
             customerPhone: newBooking.customerPhone || '',
             customerEmail: newBooking.customerEmail || '',
+            customerAddress: newBooking.customerAddress || '',
+            numberOfGuests: newBooking.numberOfGuests || 1,
             customerImage: newBooking.customerImage,
             licenseImage: newBooking.licenseImage,
             aadhaarImage: newBooking.aadhaarImage,
@@ -1134,20 +1146,30 @@ export const getFleetAgreements = async (req, res) => {
 
 // Default agreement template
 const DEFAULT_AGREEMENT_TEMPLATE = {
-    title: 'DRIVEON SELF-DRIVE VEHICLE RENTAL AGREEMENT',
-    companyName: 'Urban Mobility Rentals Private Limited (DriveOn)',
-    companySubtitle: 'Fleet Inward Vehicle Custody & Rental Contract • Regulated under Motor Vehicles Act, 1988',
-    companyAddress: 'Fleet Operations & Custody Hub, Indore (M.P.)',
-    companyContact: '+91 99939 11855 | support@driveon.in',
+    title: 'GUEST VEHICLE USE, BOOKING & BAILMENT AGREEMENT',
+    companyName: 'URBAN MOBILITY RENTALS PRIVATE LIMITED (DRIVEON)',
+    companySubtitle: 'Vehicle Rental Aggregator & Guest Bailment Agreement • Ahmedabad, Gujarat',
+    companyAddress: 'Floor No.: 4, Building No./Flat No.: 429-430, Name Of Premises/Building: Patel Avenue, Road/Street: Sarkhej Gandhi Nagar Highway, Locality/Sub Locality: Bodakdev, City/Town/Village: Ahmedabad, District: Ahmedabad, State: Gujarat, PIN Code: 380054',
+    companyContact: '+91 7610416911 | driveon721@gmail.com',
+    customClauses: `The Platform Operator and Guest are individually a “Party” and collectively the “Parties”.
+
+WHEREAS URBAN MOBILITY RENTALS PRIVATE LIMITED (DRIVEON) is a vehicle rental aggregator, facilitating bookings between Guests and independent vehicle owners, Hosts and fleet operators. URBAN MOBILITY RENTALS PRIVATE LIMITED (DRIVEON) may facilitate KYC and verification, booking, payment collection, vehicle handover/return coordination and customer support. Unless expressly stated otherwise, URBAN MOBILITY RENTALS PRIVATE LIMITED (DRIVEON) does not own the Vehicle; ownership remains with the respective Host/vehicle owner, while the Guest receives temporary possession and use subject to this Agreement, Booking terms and Applicable Law.`,
     terms: [
-        'Inspection & Handover: Hirer confirms physical inspection of vehicle condition, fuel gauge, and existing scratches before taking delivery.',
-        'Authorized Driver: The vehicle shall only be driven by the Hirer holding a valid, verified Driving License. Sub-leasing, lending, or commercial ride-hailing is strictly prohibited.',
-        'Traffic & Criminal Compliance: Hirer shall strictly adhere to speed limits (max 100 km/h), seatbelt laws, and zero alcohol/drugs. Any traffic challans, fines, or toll fees incurred during the tenure are exclusively the Hirer\'s liability.',
-        'Accident & Damage Liability: In case of accidental damage or mechanical abuse, the Hirer is liable to indemnify repair costs and downtime charges beyond standard insurance deductibles.',
-        'Return Condition: The vehicle must be returned on the agreed date/time. Late returns without prior intimation may incur penalty rates of Rs. 300/hour.',
-        'Security Deposit & Collateral: Security deposit and vehicle collateral held will be refunded/returned after safe car return without damages.'
-    ],
-    customClauses: ''
+        'VEHICLE AND BOOKING: The Vehicle is owned by/under the lawful control of Host, is provided to the Guest for temporary use, subject to this Agreement, the Booking terms and Applicable Law. Ownership and title in the Vehicle shall remain with the Host/registered owner. The Guest receives only temporary possession and use of the Vehicle during the Booking Period and acquires no ownership, lien or other proprietary interest in it.',
+        'GUEST ELIGIBILITY AND VERIFICATION: The Guest confirms that the Guest is legally competent, holds a valid driving license for the Vehicle and has provided genuine and accurate identity and verification documents. The Guest shall provide valid KYC/identity documents, residence proof, driving licence and such other documents as reasonably required by the Platform Operator. The Guest shall immediately notify the Platform Operator if the Guest\'s driving licence becomes invalid, suspended, cancelled or revoked and shall not drive thereafter. The Platform Operator may refuse, suspend or cancel the Booking where verification is incomplete, information is false or unverifiable, or continued use presents a legal, safety or security concern.',
+        'USE AND POSSESSION OF VEHICLE: Only the Guest may drive or operate the Vehicle unless another driver is expressly approved in writing by the Platform Operator/Host. The Guest shall not sell, lease, sub-let, rent, lend, transfer, assign or otherwise part with possession of the Vehicle. The Vehicle shall be used only for lawful purposes and in accordance with all applicable traffic, motor vehicle, transport and safety laws. The Guest shall bear all liability, costs, penalties, claims and expenses arising from any illegal, unlawful or criminal use of the Vehicle or any act or omission attributable to the Guest. The Guest shall not use or permit the Vehicle to be used for any offence or for transportation or possession of narcotic drugs, psychotropic substances, illegal arms or ammunition, stolen property, contraband or other prohibited material. The Guest shall not use the Vehicle for taxi, cab, ride-hailing, commercial passenger transport, sub-rental or other commercial exploitation unless expressly permitted by Applicable Law and the Booking terms. The Guest shall not use the Vehicle for racing, rallies, stunt driving, drifting, speed testing, organized motorsport, dangerous off-road activities or any other unsafe use. The Guest shall not drive under the influence of alcohol, drugs or any substance impairing safe driving. The Guest shall not take the Vehicle outside India or any restricted territory, or modify, dismantle, tune or tamper with the Vehicle or its safety, GPS or telematics systems. The Guest shall exercise reasonable care and shall not knowingly drive through flooded roads, deep water or other hazardous conditions where a reasonable driver would avoid doing so.',
+        'HANDOVER AND RETURN: The Vehicle shall be handed over against an inspection/photographic record noting, where applicable, its condition, existing damage, odometer, fuel level, keys, accessories and documents. Damage or defects recorded at handover shall be treated as pre-existing. The Guest shall be responsible only for damage or loss attributable to the Guest\'s breach, negligence, wilful misconduct, prohibited use, unauthorised driver or other act or omission. The Guest shall return the Vehicle on the agreed date, time and location in substantially the same condition as received, subject to ordinary wear and tear. Damage identified upon return may be assessed using photographs, inspection records, telematics, repair estimates, invoices, insurance assessments and other relevant evidence. Late or unauthorized retention of the Vehicle may result in applicable additional charges and reasonable recovery costs.',
+        'FINES, TOLLS, FUEL AND OTHER CHARGES: The Guest shall comply with all traffic laws, speed limits, parking restrictions and road regulations. All traffic fines, e-challans, parking charges, tolls, FASTag charges, statutory charges and other amounts attributable to the Guest\'s use of the Vehicle during the Booking Period shall be borne by the Guest. Where disclosed in the Booking terms, reasonable administrative charges for processing fines, tolls, statutory notices or similar matters may also be recovered from the Guest. The Guest shall return the Vehicle with the same fuel level as recorded at handover and shall bear any fuel shortfall and applicable refueling charge. Any towing, flushing, repair or replacement costs resulting from incorrect or contaminated fuel shall be borne by the Guest.',
+        'ACCIDENT, THEFT AND INCIDENTS: The Guest shall immediately notify the Platform Operator and Host, wherever reasonably practicable, of any accident, theft, attempted theft, breakdown, seizure, detention, material damage, loss of keys/documents or other material incident involving the Vehicle. The Guest shall promptly notify the police, insurer, emergency service or other competent authority where required by law or circumstances and shall take reasonable steps to prevent further damage. The Guest shall fully cooperate with the Host, Platform Operator, insurer, police and other competent authorities and shall provide truthful information and documents. The Guest shall not make false statements, conceal material facts, admit liability or enter into any settlement on behalf of the Host or Platform Operator without authority, where such authority can reasonably be obtained. Booking, KYC, payment, photographs, GPS, telematics and other relevant records may be preserved and disclosed to competent authorities where required or permitted by law.',
+        'DAMAGE AND FINANCIAL LIABILITY: The Guest shall be liable for reasonable and documented costs arising from damage to, loss of or recovery of the Vehicle to the extent directly attributable to the Guest\'s breach, negligence, willful misconduct, prohibited use, unauthorized driving or other act or omission. The Guest shall bear all liability, costs, penalties, claims and expenses arising from any illegal, unlawful or criminal use of the Vehicle or any act or omission attributable to the Guest. In the event of damage, accident, police seizure/impoundment, detention, abandonment or legal dispute arising from the Guest\'s use of the Vehicle, the agreed daily rental shall continue to accrue until the Vehicle is physically recovered and formally handed over to the Platform Operator/Host, subject to Applicable Law. The Guest shall not be liable for ordinary wear and tear, pre-existing defects or mechanical failure not caused by the Guest. Where damage attributable to the Guest prevents use of the Vehicle, reasonable and documented loss of use for the reasonably required repair period may be recovered, subject to Applicable Law.',
+        'SECURITY DEPOSIT: The Guest shall provide a refundable Security Deposit of not less than INR 10,000/-, or such higher amount as specified at the time of Booking. Subject to Applicable Law, the Platform Operator may adjust the Security Deposit against properly established amounts payable by the Guest, including damage, fines, tolls, fuel shortfall, recovery expenses and other contractual charges. The balance shall be refunded after completion of the Booking and reconciliation of applicable charges, subject to any pending claim or statutory charge. Payment of the Security Deposit shall not limit the Guest\'s liability for amounts lawfully exceeding the deposit.',
+        'GPS, TELEMATICS AND DATA: The Vehicle may be equipped with GPS, telematics, speed monitoring, keyless access, immobilisation or other technology for safety, security, trip administration, fraud prevention and vehicle recovery. The Guest shall not tamper with, disconnect, remove, shield or bypass such systems and shall bear reasonable repair or replacement costs resulting from such tampering. Personal, location and Vehicle data may be collected, processed, stored and disclosed in accordance with Applicable Law, the applicable Privacy Policy and lawful requests of competent authorities. Electronic Booking records, OTPs, digital acknowledgements, photographs, payment records, GPS/telematics records and inspection records may be relied upon as evidence of the relevant transaction, subject to Applicable Law.',
+        'INDEMNITY: The Guest shall indemnify the Host and Platform Operator against reasonable and documented losses, damages, third party claims, costs and legal expenses directly arising from the Guest\'s breach of this Agreement, unlawful or prohibited use, unauthorised driving or possession, negligence, wilful misconduct, false information, failure to return the Vehicle or damage/loss for which the Guest is responsible. The Guest shall not indemnify the Platform Operator for loss arising solely from the Platform Operator\'s fraud, wilful misconduct or breach of Applicable Law.',
+        'SUSPENSION, TERMINATION AND RECOVERY: The Platform Operator may suspend or terminate the Booking where the Guest provides false information, loses driving eligibility, materially breaches this Agreement, uses the Vehicle unlawfully, creates a safety/security risk or violates the Booking terms. Immediate termination may be effected in cases of unlawful use, unauthorised driving, intoxicated driving, abandonment or refusal to return the Vehicle, material tampering or prohibited commercial use. Upon expiry or termination, the Guest shall immediately stop using and return the Vehicle to the designated location. If the Guest fails to return the Vehicle, the Host and/or Platform Operator may take all lawful and reasonable steps necessary to recover the Vehicle, including approaching competent authorities.',
+        'PLATFORM LIABILITY: To the maximum extent permitted by Applicable Law, the Platform Operator shall not be liable for indirect, incidental, special or consequential loss, loss of time or inconvenience arising from the Guest\'s use of the Vehicle. The Platform Operator shall not be responsible for personal belongings left in the Vehicle or mechanical defects attributable solely to the Vehicle/Host, except for liability which cannot legally be excluded. Nothing in this Agreement shall exclude or limit liability which cannot lawfully be excluded or limited.',
+        'GOVERNING LAW AND DISPUTE RESOLUTION: This Agreement shall be governed by the laws of India. Any contractual dispute capable of arbitration shall be referred to arbitration under the Arbitration and Conciliation Act, 1996, as amended. The Parties shall endeavour to mutually appoint a sole arbitrator within thirty (30) days of a written notice invoking arbitration, failing which either Party may seek appointment in accordance with law. The seat of arbitration shall be Ahmedabad, Gujarat, and the proceedings shall be conducted in English. Subject to arbitration and Applicable Law, courts having competent jurisdiction at Ahmedabad, Gujarat shall have jurisdiction in relation to proceedings arising from this Agreement.',
+        'GENERAL: This Agreement, together with the Booking confirmation and applicable Platform terms/policies, constitutes the agreement between the Parties concerning the Booking. If any provision is held invalid or unenforceable, the remaining provisions shall continue to the extent permitted by Applicable Law. No failure or delay in exercising any right shall constitute a waiver. The Guest shall not assign or transfer rights or obligations under this Agreement without prior written consent. Provisions relating to payment, damage, indemnity, liability, data, records and dispute resolution shall survive expiry or termination to the extent applicable.'
+    ]
 };
 
 // Get master agreement template

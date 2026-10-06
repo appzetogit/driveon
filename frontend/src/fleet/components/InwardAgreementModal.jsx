@@ -32,11 +32,11 @@ const InwardAgreementModal = ({
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const documentSheetRef = useRef(null);
   const [template, setTemplate] = useState({
-    title: '',
-    companyName: '',
-    companySubtitle: '',
-    companyAddress: '',
-    companyContact: '',
+    title: 'GUEST VEHICLE USE, BOOKING & BAILMENT AGREEMENT',
+    companyName: 'URBAN MOBILITY RENTALS PRIVATE LIMITED (DRIVEON)',
+    companySubtitle: 'Vehicle Rental Aggregator & Guest Bailment Agreement • Ahmedabad, Gujarat',
+    companyAddress: 'Floor No.: 4, Building No./Flat No.: 429-430, Name Of Premises/Building: Patel Avenue, Road/Street: Sarkhej Gandhi Nagar Highway, Locality/Sub Locality: Bodakdev, City/Town/Village: Ahmedabad, District: Ahmedabad, State: Gujarat, PIN Code: 380054',
+    companyContact: '+91 7610416911 | driveon721@gmail.com',
     terms: [],
     customClauses: ''
   });
@@ -79,9 +79,14 @@ const InwardAgreementModal = ({
     customerName,
     customerPhone,
     customerEmail,
+    customerAddress: propCustomerAddress,
+    numberOfGuests,
     licenseNumber,
+    isDlVerified = bookingDetails.isDlVerified || false,
     panNumber,
+    isPanVerified = bookingDetails.isPanVerified || bookingDetails.panVerified || false,
     aadhaarNumber,
+    isAadhaarVerified = bookingDetails.isAadhaarVerified || bookingDetails.aadhaarVerified || false,
     car,
     fromDate,
     toDate,
@@ -92,22 +97,85 @@ const InwardAgreementModal = ({
     advanceAmount,
     depositType,
     deposit,
-    depositItemType,
-    depositItemName,
+    depositItemType = bookingDetails.depositItem?.itemType || 'Bike / Motorcycle',
+    depositItemName: propDepositItemName,
+    depositItemNumber: propDepositItemNumber,
   } = bookingDetails;
+
+  // Resolve customer address from all potential sources
+  const customerAddress = (
+    propCustomerAddress ||
+    bookingDetails.customerAddress ||
+    bookingDetails.address ||
+    bookingDetails.customer_address ||
+    bookingDetails.guestAddress ||
+    existingAgreement?.customerAddress ||
+    existingAgreement?.address ||
+    existingAgreement?.bookingDetails?.customerAddress ||
+    verifiedAgreement?.customerAddress ||
+    ''
+  ).trim();
+
+  // Resolve deposit item model and registration number plate
+  const depositItemName = (
+    propDepositItemName ||
+    bookingDetails.depositItemName ||
+    bookingDetails.depositItem?.itemName ||
+    bookingDetails.depositItem?.name ||
+    existingAgreement?.depositItemName ||
+    existingAgreement?.depositItem?.itemName ||
+    verifiedAgreement?.depositItemName ||
+    'Vehicle'
+  ).trim();
+
+  const depositItemNumber = (
+    propDepositItemNumber ||
+    bookingDetails.depositItemNumber ||
+    bookingDetails.depositItem?.itemNumber ||
+    bookingDetails.depositItem?.number ||
+    bookingDetails.depositItem?.plateNumber ||
+    existingAgreement?.depositItemNumber ||
+    existingAgreement?.depositItem?.itemNumber ||
+    verifiedAgreement?.depositItemNumber ||
+    ''
+  ).trim();
+
+  // Resolve booking ID
+  const bookingId = (
+    bookingDetails.id ||
+    bookingDetails.bookingId ||
+    bookingDetails.originalBookingId ||
+    bookingDetails.mongoId ||
+    bookingDetails._id ||
+    existingAgreement?.bookingId ||
+    existingAgreement?.originalBookingId ||
+    verifiedAgreement?.bookingId ||
+    ''
+  ).toString().trim();
 
   const agreementId =
     verifiedAgreement?.agreementNumber ||
     `AGR-INW-${customerPhone ? customerPhone.slice(-4) : '0000'}-${new Date().getFullYear()}`;
 
+  const agreementDateFormatted = verifiedAgreement?.verifiedAt
+    ? new Date(verifiedAgreement.verifiedAt).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : (fromDate && formatDateDisplay(fromDate) !== '-')
+      ? formatDateDisplay(fromDate)
+      : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
   const interpolate = (text) => {
     if (!text || typeof text !== 'string') return text || '';
-    return text
+    let result = text
+      .replace(/{{agreement_date}}/gi, agreementDateFormatted)
+      .replace(/{{booking_id}}/gi, bookingId ? `#${bookingId}` : 'N/A')
       .replace(/{{customer_name}}/gi, customerName || 'Customer')
       .replace(/{{customer_phone}}/gi, customerPhone || 'N/A')
       .replace(/{{customer_email}}/gi, customerEmail || 'N/A')
-      .replace(/{{license_number}}/gi, licenseNumber || 'Verified')
-      .replace(/{{pan_number}}/gi, panNumber || aadhaarNumber || 'Verified')
+      .replace(/{{customer_address}}/gi, customerAddress || 'N/A')
+      .replace(/{{number_of_guests}}/gi, `${numberOfGuests || 1} Member(s)`)
+      .replace(/{{guests_count}}/gi, `${numberOfGuests || 1}`)
+      .replace(/{{license_number}}/gi, licenseNumber || 'N/A')
+      .replace(/{{pan_number}}/gi, panNumber ? (isPanVerified ? `${panNumber} (Verified)` : panNumber) : (aadhaarNumber ? (isAadhaarVerified ? `${aadhaarNumber} (Verified)` : aadhaarNumber) : 'N/A'))
       .replace(/{{car_name}}/gi, car?.name || 'Vehicle')
       .replace(/{{car_number}}/gi, car?.registrationNumber || car?.carNumber || 'Assigned on Delivery')
       .replace(/{{from_date}}/gi, formatDateDisplay(fromDate))
@@ -117,7 +185,18 @@ const InwardAgreementModal = ({
       .replace(/{{total_price}}/gi, `₹${totalPrice || 0}`)
       .replace(/{{advance_amount}}/gi, `₹${advanceAmount || 0}`)
       .replace(/{{security_deposit}}/gi, `₹${deposit || 0}`)
-      .replace(/{{deposit_item}}/gi, `${depositItemName || 'Vehicle'} (${depositItemType || 'Bike/Scooter'})`);
+      .replace(/{{deposit_item}}/gi, `${depositItemName || 'Vehicle'}${depositItemNumber ? ` [Reg: ${depositItemNumber}]` : ''} (${depositItemType || 'Bike/Scooter'})`);
+
+    // In case older agreement or text has unreplaced placeholders or "YUG TRAVELS"
+    if (result.includes('YUG TRAVELS') || result.includes('____________')) {
+      result = result
+        .replace(/YUG TRAVELS/gi, 'URBAN MOBILITY RENTALS PRIVATE LIMITED (DRIVEON)')
+        .replace(/GF-17, Saral Parivesh, IOC Road, Mansarovar Circle, Chandkheda, Ahmedabad-382424/gi, 'Floor No.: 4, Building No./Flat No.: 429-430, Name Of Premises/Building: Patel Avenue, Road/Street: Sarkhej Gandhi Nagar Highway, Locality/Sub Locality: Bodakdev, City/Town/Village: Ahmedabad, District: Ahmedabad, State: Gujarat, PIN Code: 380054')
+        .replace(/This Agreement is executed on ____________ 2026 at ____________________, India/gi, `This Agreement is executed on ${agreementDateFormatted} at Ahmedabad, Gujarat, India`)
+        .replace(/This Agreement is executed on ____________ [0-9]{4} at ____________________, India/gi, `This Agreement is executed on ${agreementDateFormatted} at Ahmedabad, Gujarat, India`);
+    }
+
+    return result;
   };
 
   // Handle Send OTP
@@ -218,7 +297,15 @@ const InwardAgreementModal = ({
 
     try {
       generateInwardAgreementPDF({
-        bookingDetails,
+        bookingDetails: {
+          ...bookingDetails,
+          id: bookingId,
+          bookingId,
+          customerAddress,
+          depositItemName,
+          depositItemNumber,
+          depositItemType,
+        },
         agreementId,
         verifiedAgreement: verifiedAgreement || existingAgreement || (isAlreadyDone ? {
           phoneVerified: customerPhone,
@@ -269,8 +356,14 @@ const InwardAgreementModal = ({
                   {verifiedAgreement ? '✓ Approved via OTP' : 'Pending OTP Verification'}
                 </span>
               </div>
-              <p className="text-xs font-mono mt-0.5" style={{ color: colors.textSecondary }}>
-                Ref ID: {agreementId}
+              <p className="text-xs font-mono mt-0.5 flex flex-wrap items-center gap-2" style={{ color: colors.textSecondary }}>
+                <span>Ref ID: <strong className="font-semibold text-gray-700 dark:text-gray-200">{agreementId}</strong></span>
+                {bookingId && (
+                  <>
+                    <span>•</span>
+                    <span>Booking ID: <strong className="font-bold text-blue-600 dark:text-blue-400">#{bookingId}</strong></span>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -331,10 +424,18 @@ const InwardAgreementModal = ({
               <p className="text-xs text-gray-500 mt-1">
                 {interpolate(template.companySubtitle)}
               </p>
-              <div className="mt-3 flex flex-wrap justify-center gap-4 text-xs font-semibold text-gray-600">
-                <span>Agreement Date: {new Date().toLocaleDateString('en-IN')}</span>
+              <div className="mt-3 flex flex-wrap justify-center items-center gap-3 text-xs font-semibold text-gray-600">
+                <span>Agreement Date: {agreementDateFormatted}</span>
                 <span>•</span>
                 <span>Agreement Ref: {agreementId}</span>
+                {bookingId && (
+                  <>
+                    <span>•</span>
+                    <span className="inline-flex items-center gap-1">
+                      Booking ID: <strong className="font-mono text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">#{bookingId}</strong>
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -354,18 +455,57 @@ const InwardAgreementModal = ({
                   Second Party (Hirer / Customer)
                 </span>
                 <p className="font-bold text-gray-900 text-sm">{customerName || 'N/A'}</p>
-                <p className="text-gray-700 font-semibold">Mobile: +91 {customerPhone || 'N/A'}</p>
+                <p className="text-gray-700 font-semibold">
+                  Mobile: +91 {customerPhone || 'N/A'}
+                </p>
+                {bookingId && (
+                  <p className="text-gray-600">
+                    <span className="font-semibold text-gray-700">Booking ID:</span>{' '}
+                    <span className="font-mono font-bold text-blue-700">#{bookingId}</span>
+                  </p>
+                )}
+                <p className="text-gray-600">
+                  <span className="font-semibold text-gray-700">Address:</span>{' '}
+                  {customerAddress ? (
+                    <span className="text-gray-900 font-medium">{customerAddress}</span>
+                  ) : (
+                    <span className="text-gray-400 italic">Not provided</span>
+                  )}
+                </p>
                 <p className="text-gray-600">Email: {customerEmail || 'N/A'}</p>
                 <p className="text-gray-600">
-                  DL No: {licenseNumber || 'Verified'} • PAN/ID: {panNumber || aadhaarNumber || 'Verified'}
+                  DL No: {licenseNumber || 'N/A'}
+                  {panNumber ? (
+                    <> • PAN: {panNumber}{isPanVerified ? ' (Verified)' : ''}</>
+                  ) : aadhaarNumber ? (
+                    <> • Aadhaar: XXXX-XXXX-{aadhaarNumber.slice(-4)}{isAadhaarVerified ? ' (Verified)' : ''}</>
+                  ) : null}
                 </p>
               </div>
             </div>
 
+            {/* Agreement Execution Preamble & Recitals */}
+            {template.customClauses && (
+              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/50 text-xs text-slate-800 space-y-2">
+                <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-[11px] text-blue-900">
+                  <span>📜</span>
+                  <span>Agreement Execution Preamble & Recitals</span>
+                </div>
+                <p className="leading-relaxed whitespace-pre-line text-slate-700">
+                  {interpolate(template.customClauses)}
+                </p>
+              </div>
+            )}
+
             {/* Vehicle & Rental Period */}
             <div className="rounded-lg border border-gray-200 overflow-hidden text-xs">
-              <div className="bg-gray-100 p-2.5 font-bold uppercase tracking-wider text-gray-700">
-                Vehicle & Rental Tenure Details
+              <div className="bg-gray-100 p-2.5 font-bold uppercase tracking-wider text-gray-700 flex flex-wrap justify-between items-center gap-2">
+                <span>Vehicle & Rental Tenure Details</span>
+                {bookingId && (
+                  <span className="font-mono font-bold text-[11px] text-blue-700 normal-case bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                    Booking ID: #{bookingId}
+                  </span>
+                )}
               </div>
               <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
@@ -426,8 +566,13 @@ const InwardAgreementModal = ({
                 {(depositType === 'item' || depositType === 'both') && (
                   <p>
                     • <strong className="text-gray-900">Physical Collateral Held:</strong> Hirer has pledged personal
-                    two-wheeler <strong className="text-blue-700">{depositItemName || 'Vehicle'}</strong> (
-                    {depositItemType || 'Bike/Scooter'}) in custody of the First Party until car return.
+                    two-wheeler <strong className="text-blue-700">{depositItemName || 'Vehicle'}</strong>
+                    {depositItemNumber ? (
+                      <span className="font-mono font-bold text-gray-900 bg-amber-100/90 px-1.5 py-0.5 rounded border border-amber-300 ml-1.5 shadow-xs">
+                        [Reg No: {depositItemNumber}]
+                      </span>
+                    ) : null}{' '}
+                    ({depositItemType || 'Bike / Motorcycle'}) in custody of the First Party until car return.
                   </p>
                 )}
                 {depositType === 'none' && (
@@ -450,14 +595,7 @@ const InwardAgreementModal = ({
               </ol>
             </div>
 
-            {template.customClauses && (
-              <div className="p-3.5 rounded-lg border border-amber-200 bg-amber-50/60 text-xs text-amber-900 space-y-1">
-                <span className="font-bold uppercase tracking-wider text-[11px] block">
-                  Special Conditions & Notes
-                </span>
-                <p className="leading-relaxed whitespace-pre-line">{interpolate(template.customClauses)}</p>
-              </div>
-            )}
+
 
             {/* Digital Verification Status Seal */}
             {verifiedAgreement && (

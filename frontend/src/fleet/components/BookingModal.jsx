@@ -4,6 +4,7 @@ import api from '../../services/api';
 import { Button } from '../../components/common';
 import { commonService } from '../../services/common.service';
 import InwardAgreementModal from './InwardAgreementModal';
+import { useFleet } from '../context/FleetContext';
 import {
   getDaysBetween,
   getDaysBetweenWithTime,
@@ -30,9 +31,13 @@ const formatDateToDisplay = (dateStr) => {
 };
 
 const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
+  const fleetContext = useFleet();
+  const [liveFleetBookings, setLiveFleetBookings] = useState([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [numberOfGuests, setNumberOfGuests] = useState(1);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -88,6 +93,18 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
+      // Fetch latest fleet bookings on modal open to ensure fresh deposit item statuses
+      const fetchLatestFleetBookings = async () => {
+        try {
+          const res = await api.get('/fleet/outward-bookings');
+          if (res.data?.success && Array.isArray(res.data.data)) {
+            setLiveFleetBookings(res.data.data);
+          }
+        } catch (err) {
+          console.error('Failed to load fleet bookings for deposit check:', err);
+        }
+      };
+      fetchLatestFleetBookings();
     } else {
       document.body.style.overflow = '';
     }
@@ -256,6 +273,8 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     setCustomerName('');
     setCustomerPhone('');
     setCustomerEmail('');
+    setCustomerAddress('');
+    setNumberOfGuests(1);
     setFromDate(todayStr);
     setToDate(tomorrowStr);
     setStartTime(timeStr);
@@ -326,10 +345,90 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     return (existingBookings || []).some((b) => rangesOverlapInclusive(fromDate, toDate, b.fromDate, b.toDate));
   }, [existingBookings, fromDate, toDate]);
 
+  const allBookingsToCheck = useMemo(() => {
+    const list = [];
+    const seenIds = new Set();
+    const addB = (b) => {
+      if (!b) return;
+      const id = b.id || b._id;
+      if (id && !seenIds.has(id)) {
+        seenIds.add(id);
+        list.push(b);
+      } else if (!id) {
+        list.push(b);
+      }
+    };
+    if (Array.isArray(liveFleetBookings)) liveFleetBookings.forEach(addB);
+    if (fleetContext?.bookings && Array.isArray(fleetContext.bookings)) fleetContext.bookings.forEach(addB);
+    if (Array.isArray(existingBookings)) existingBookings.forEach(addB);
+    return list;
+  }, [liveFleetBookings, fleetContext?.bookings, existingBookings]);
+
+  // Instant check if entered vehicle number is already deposited in another active booking
+  const alreadyDepositedConflict = useMemo(() => {
+    if (car?.type !== 'inward') return null;
+    if (depositType !== 'item' && depositType !== 'both') return null;
+
+    const clean = (val) => String(val || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const cleanNum = clean(depositItemNumber);
+    const cleanName = clean(depositItemName);
+
+    // Only run conflict check if at least 4 alphanumeric characters have been entered
+    if ((!cleanNum || cleanNum.length < 4) && (!cleanName || cleanName.length < 4)) {
+      return null;
+    }
+
+    for (const b of allBookingsToCheck) {
+      if (b.status === 'cancelled') continue;
+      const depItem = b.depositItem;
+      if (!depItem) continue;
+      // If the vehicle was already marked as returned, it's no longer held
+      if (depItem.returnStatus === 'returned') continue;
+
+      const bNum = clean(depItem.itemNumber);
+      const bName = clean(depItem.itemName);
+
+      // 1. Check against depositItemNumber
+      if (cleanNum && cleanNum.length >= 4) {
+        if (bNum && (bNum === cleanNum || (cleanNum.length >= 5 && bNum.includes(cleanNum)) || (bNum.length >= 5 && cleanNum.includes(bNum)))) {
+          return {
+            matchedNumber: depItem.itemNumber || depItem.itemName || depositItemNumber,
+            booking: b,
+          };
+        }
+        if (bName && (bName === cleanNum || (cleanNum.length >= 5 && bName.includes(cleanNum)) || (bName.length >= 5 && cleanNum.includes(bName)))) {
+          return {
+            matchedNumber: depItem.itemName || depItem.itemNumber || depositItemNumber,
+            booking: b,
+          };
+        }
+      }
+
+      // 2. Check against depositItemName if user typed registration number in name field
+      if (cleanName && cleanName.length >= 4 && /\d/.test(cleanName)) {
+        if (bNum && (bNum === cleanName || (cleanName.length >= 5 && bNum.includes(cleanName)) || (bNum.length >= 5 && cleanName.includes(bNum)))) {
+          return {
+            matchedNumber: depItem.itemNumber || depItem.itemName || depositItemName,
+            booking: b,
+          };
+        }
+        if (bName && (bName === cleanName || (cleanName.length >= 5 && bName.includes(cleanName)) || (bName.length >= 5 && cleanName.includes(bName)))) {
+          return {
+            matchedNumber: depItem.itemName || depItem.itemNumber || depositItemName,
+            booking: b,
+          };
+        }
+      }
+    }
+
+    return null;
+  }, [car?.type, depositType, depositItemNumber, depositItemName, allBookingsToCheck]);
+
   const canSubmit = useMemo(() => {
     if (!car) return false;
     if (!customerName.trim()) return false;
     if (!customerPhone.trim()) return false;
+    if (!customerAddress.trim()) return false;
     if (!customerImagePreview) return false;
     if (!isDlVerified) return false; // Driving license must be verified
     if (panNumber.trim() && !isPanVerified) return false; // If PAN is entered, it must be verified
@@ -338,10 +437,13 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     if (!isValidDateRange(fromDate, toDate)) return false;
     if (hasOverlap) return false;
     if (paymentMode === 'cash' && !cashCollector) return false;
-    if (car.type === 'inward' && (depositType === 'item' || depositType === 'both') && !depositItemName.trim()) return false;
+    if (car.type === 'inward' && (depositType === 'item' || depositType === 'both')) {
+      if (!depositItemName.trim() && !depositItemNumber.trim()) return false;
+      if (alreadyDepositedConflict) return false;
+    }
     if (car.type === 'inward' && !isAgreementDone) return false;
     return true;
-  }, [car, customerName, customerPhone, customerImagePreview, fromDate, toDate, startTime, endTime, isDlVerified, isPanVerified, panNumber, hasOverlap, paymentMode, cashCollector, depositType, depositItemName, isAgreementDone]);
+  }, [car, customerName, customerPhone, customerAddress, customerImagePreview, fromDate, toDate, startTime, endTime, isDlVerified, isPanVerified, panNumber, hasOverlap, paymentMode, cashCollector, depositType, depositItemName, depositItemNumber, alreadyDepositedConflict, isAgreementDone]);
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -358,6 +460,7 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     setError('');
     if (!customerName.trim()) { setError('Please enter customer name'); return; }
     if (!customerPhone.trim()) { setError('Please enter customer phone number'); return; }
+    if (!customerAddress.trim()) { setError('Please enter customer/guest address'); return; }
     if (!customerImagePreview) { setError('Please upload a customer photo'); return; }
     if (!fromDate || !toDate || !isValidDateRange(fromDate, toDate)) { setError('Please select a valid date range'); return; }
     if (!startTime || !endTime) { setError('Please select start and end times'); return; }
@@ -366,9 +469,15 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     // Aadhaar is optional — no verification required
     if (hasOverlap) { setError('Car is already booked for these dates'); return; }
     if (paymentMode === 'cash' && !cashCollector) { setError('Please select who collected the cash'); return; }
-    if (car.type === 'inward' && (depositType === 'item' || depositType === 'both') && !depositItemName.trim()) {
-      setError('Please enter the deposited item / bike model name');
-      return;
+    if (car.type === 'inward' && (depositType === 'item' || depositType === 'both')) {
+      if (!depositItemName.trim() && !depositItemNumber.trim()) {
+        setError('Please enter the deposited vehicle details (Registration Number or Model Name)');
+        return;
+      }
+      if (alreadyDepositedConflict) {
+        setError(`Cannot confirm: Vehicle (${alreadyDepositedConflict.matchedNumber}) is currently already deposited in active booking #${alreadyDepositedConflict.booking.id} (${alreadyDepositedConflict.booking.customerName}).`);
+        return;
+      }
     }
     if (car.type === 'inward' && !isAgreementDone) {
       setError('Please read and verify the Inward Rental Agreement via customer OTP before confirming booking');
@@ -386,6 +495,8 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail.trim(),
+        customerAddress: customerAddress.trim(),
+        numberOfGuests: Number(numberOfGuests) || 1,
         customerImage: customerImagePreview,
         panNumber: panNumber.trim().toUpperCase(),
         panVerified: isPanVerified,
@@ -407,10 +518,10 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
         deposit: car.type === 'inward' && (depositType === 'money' || depositType === 'both') ? (Number(deposit) || 0) : 0,
         depositItem: car.type === 'inward' && (depositType === 'item' || depositType === 'both') ? {
           itemType: depositItemType || 'Bike / Motorcycle',
-          itemName: depositItemName.trim(),
-          itemNumber: '',
-          itemDetails: '',
-          itemImage: '',
+          itemName: depositItemName.trim() || 'Vehicle',
+          itemNumber: depositItemNumber.trim().toUpperCase(),
+          itemDetails: depositItemDetails.trim(),
+          itemImage: depositItemImagePreview || '',
           returnStatus: 'deposited',
         } : null,
         cashCollector: paymentMode === 'cash' ? cashCollector : '',
@@ -580,6 +691,21 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
                   placeholder="customer@email.com"
                 />
               </div>
+            </div>
+
+            {/* Address */}
+            <div>
+              <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                Address <span style={{ color: colors.accentRed }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2 outline-none text-sm"
+                style={inputStyle}
+                placeholder="Enter house no., street, city, pin code"
+              />
             </div>
           </div>
 
@@ -896,8 +1022,8 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
                     </div>
                   </div>
 
-                  {/* Vehicle Category & Bike/Scooter Model */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Vehicle Category, Number & Model */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-semibold mb-1" style={labelStyle}>
                         Vehicle Category <span style={{ color: colors.accentRed }}>*</span>
@@ -915,7 +1041,25 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
 
                     <div>
                       <label className="block text-xs font-semibold mb-1" style={labelStyle}>
-                        Bike / Scooter Name & Model <span style={{ color: colors.accentRed }}>*</span>
+                        Vehicle Number / Plate <span style={{ color: colors.accentRed }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={depositItemNumber}
+                        onChange={(e) => setDepositItemNumber(e.target.value.toUpperCase())}
+                        className={`w-full rounded-lg border px-3 py-2 text-sm outline-none font-mono uppercase font-bold tracking-wider transition-all ${
+                          alreadyDepositedConflict
+                            ? 'border-red-500 bg-red-50 text-red-900 ring-2 ring-red-400'
+                            : ''
+                        }`}
+                        style={alreadyDepositedConflict ? undefined : inputStyle}
+                        placeholder="e.g. MP33MJ8838"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1" style={labelStyle}>
+                        Bike / Scooter Model <span style={{ color: colors.accentRed }}>*</span>
                       </label>
                       <input
                         type="text"
@@ -923,11 +1067,49 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
                         onChange={(e) => setDepositItemName(e.target.value)}
                         className="w-full rounded-lg border px-3 py-2 text-sm outline-none font-medium"
                         style={inputStyle}
-                        placeholder="e.g. Hero Splendor Plus / Honda Activa 6G"
+                        placeholder="e.g. Hero Splendor Plus / Activa"
                         required
                       />
                     </div>
                   </div>
+
+                  {/* Instant Warning for Already Deposited Vehicle */}
+                  {alreadyDepositedConflict && (
+                    <div className="p-3.5 rounded-xl border border-red-300 bg-red-50 text-red-900 text-xs space-y-2.5 shadow-sm animate-fade-in">
+                      <div className="flex items-center gap-2 font-bold text-red-700 text-sm">
+                        <span className="text-lg">⚠️</span>
+                        <span>Currently this vehicle is deposited already!</span>
+                      </div>
+                      <p className="text-red-700 font-medium">
+                        Vehicle number <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-red-300 text-red-900">{alreadyDepositedConflict.matchedNumber}</span> is currently already deposited with admin in another booking.
+                      </p>
+                      <div className="bg-white rounded-lg p-3 border border-red-200 text-xs space-y-1.5 text-gray-800 shadow-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500 font-medium">Active Booking:</span>
+                          <span className="font-mono font-bold text-red-700">#{alreadyDepositedConflict.booking.id}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500 font-medium">Customer:</span>
+                          <span className="font-semibold text-gray-900">
+                            {alreadyDepositedConflict.booking.customerName} {alreadyDepositedConflict.booking.customerPhone ? `(${alreadyDepositedConflict.booking.customerPhone})` : ''}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500 font-medium">Rented Car:</span>
+                          <span className="font-semibold text-gray-900">{alreadyDepositedConflict.booking.carName}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-500 font-medium">Collateral Status:</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 uppercase">
+                            Currently Deposited (Not Returned)
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-red-600 font-semibold flex items-center gap-1.5">
+                        <span>🚫</span> This vehicle must be returned to the customer in the previous booking before it can be deposited again.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1170,12 +1352,19 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
         open={showAgreementModal}
         onClose={() => setShowAgreementModal(false)}
         bookingDetails={{
+          id: agreementDetails?.bookingId || 'New Reservation',
+          bookingId: agreementDetails?.bookingId || 'New Reservation',
           customerName,
           customerPhone,
           customerEmail,
+          customerAddress: customerAddress.trim(),
+          numberOfGuests: Number(numberOfGuests) || 1,
           licenseNumber,
-          panNumber,
-          aadhaarNumber,
+          isDlVerified,
+          panNumber: panNumber.trim().toUpperCase(),
+          isPanVerified,
+          aadhaarNumber: aadhaarNumber.trim(),
+          isAadhaarVerified,
           car,
           fromDate,
           toDate,
@@ -1187,7 +1376,13 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
           depositType,
           deposit,
           depositItemType,
-          depositItemName,
+          depositItemName: depositItemName.trim(),
+          depositItemNumber: depositItemNumber.trim().toUpperCase(),
+          depositItem: {
+            itemType: depositItemType,
+            itemName: depositItemName.trim(),
+            itemNumber: depositItemNumber.trim().toUpperCase(),
+          },
         }}
         existingAgreement={agreementDetails}
         isAlreadyDone={isAgreementDone}
