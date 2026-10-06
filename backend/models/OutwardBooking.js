@@ -31,6 +31,14 @@ const outwardBookingSchema = new mongoose.Schema(
     customerEmail: {
       type: String,
     },
+    customerAddress: {
+      type: String,
+      default: '',
+    },
+    numberOfGuests: {
+      type: Number,
+      default: 1,
+    },
     customerImage: {
       type: String,
     },
@@ -188,6 +196,51 @@ const outwardBookingSchema = new mongoose.Schema(
       approvedByOtp: {
         type: Boolean,
         default: false,
+      },
+    },
+    guarantor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    guarantorDetails: {
+      guarantorId: {
+        type: String,
+        default: '',
+      },
+      name: {
+        type: String,
+        default: '',
+      },
+      phone: {
+        type: String,
+        default: '',
+      },
+      email: {
+        type: String,
+        default: '',
+      },
+      kycStatus: {
+        type: String,
+        default: 'pending',
+      },
+      verificationStatus: {
+        type: String,
+        default: 'pending',
+      },
+      invitationStatus: {
+        type: String,
+        default: 'accepted',
+      },
+      verificationDate: {
+        type: Date,
+      },
+      invitationSentDate: {
+        type: Date,
+        default: Date.now,
+      },
+      invitationAcceptedDate: {
+        type: Date,
       },
     }
   },

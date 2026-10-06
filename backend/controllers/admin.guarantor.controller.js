@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import GuarantorRequest from '../models/GuarantorRequest.js';
 import Booking from '../models/Booking.js';
+import OutwardBooking from '../models/OutwardBooking.js';
 import User from '../models/User.js';
 import GuarantorPoints from '../models/GuarantorPoints.js';
 
@@ -40,15 +41,6 @@ export const sendGuarantorRequest = async (req, res) => {
       });
     }
 
-    // Validate bookingId format (must be valid MongoDB ObjectId)
-    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-      console.error('❌ Invalid booking ID format:', bookingId);
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid booking ID format. Please provide a valid MongoDB ObjectId.',
-      });
-    }
-
     // Validate guarantorId is not empty
     if (typeof guarantorId !== 'string' || !guarantorId.trim()) {
       console.error('❌ Invalid guarantor ID format:', typeof guarantorId);
@@ -58,23 +50,41 @@ export const sendGuarantorRequest = async (req, res) => {
       });
     }
 
-    // Find booking by MongoDB _id
-    let booking;
-    try {
-      console.log('🔍 Finding booking with ID:', bookingId);
-      booking = await Booking.findById(bookingId).populate('user', 'name email phone');
-      console.log('✅ Booking found:', {
-        bookingId: booking?._id?.toString(),
-        hasUser: !!booking?.user,
-        userId: booking?.user?._id?.toString(),
-      });
-    } catch (dbError) {
-      console.error('❌ Database error finding booking:', dbError);
-      return res.status(500).json({
-        success: false,
-        message: 'Database error while finding booking',
-        error: process.env.NODE_ENV === 'development' ? dbError.message : undefined,
-      });
+    // Find booking (either standard Booking or OutwardBooking)
+    let booking = null;
+    let isOutward = false;
+
+    if (mongoose.Types.ObjectId.isValid(bookingId)) {
+      try {
+        booking = await Booking.findById(bookingId).populate('user', 'name email phone');
+      } catch (err) {
+        console.error('Error finding Booking by ObjectId:', err);
+      }
+    }
+
+    if (!booking) {
+      try {
+        booking = await Booking.findOne({ bookingId: bookingId }).populate('user', 'name email phone');
+      } catch (err) {
+        console.error('Error finding Booking by bookingId string:', err);
+      }
+    }
+
+    // If still not found, check OutwardBooking (inward fleet bookings)
+    if (!booking) {
+      try {
+        if (mongoose.Types.ObjectId.isValid(bookingId)) {
+          booking = await OutwardBooking.findById(bookingId);
+        }
+        if (!booking) {
+          booking = await OutwardBooking.findOne({ originalBookingId: bookingId });
+        }
+        if (booking) {
+          isOutward = true;
+        }
+      } catch (outwardErr) {
+        console.error('Error finding OutwardBooking:', outwardErr);
+      }
     }
 
     if (!booking) {
@@ -85,7 +95,60 @@ export const sendGuarantorRequest = async (req, res) => {
       });
     }
 
-    // Check if booking has a user
+    // Handle Outward / Fleet booking directly
+    if (isOutward) {
+      const guarantor = await User.findOne({ guarantorId: guarantorId.trim() });
+      if (!guarantor) {
+        return res.status(404).json({
+          success: false,
+          message: 'Guarantor not found with this ID. Please verify the Guarantor ID is correct.',
+        });
+      }
+
+      booking.guarantor = guarantor._id;
+      booking.guarantorDetails = {
+        guarantorId: guarantor.guarantorId,
+        name: guarantor.name,
+        phone: guarantor.phone || '',
+        email: guarantor.email || '',
+        kycStatus: guarantor.kycStatus || 'pending',
+        verificationStatus: 'verified',
+        invitationStatus: 'accepted',
+        verificationDate: new Date(),
+        invitationSentDate: new Date(),
+        invitationAcceptedDate: new Date(),
+      };
+      await booking.save();
+
+      return res.status(201).json({
+        success: true,
+        message: 'Guarantor request sent and linked successfully',
+        data: {
+          request: {
+            _id: booking._id.toString(),
+            status: 'accepted',
+            guarantor: {
+              _id: guarantor._id.toString(),
+              name: guarantor.name,
+              email: guarantor.email,
+              phone: guarantor.phone,
+              guarantorId: guarantor.guarantorId,
+            },
+            booking: {
+              _id: booking._id.toString(),
+              bookingId: booking.originalBookingId,
+            },
+            user: {
+              name: booking.customerName,
+              email: booking.customerEmail,
+              phone: booking.customerPhone,
+            },
+          },
+        },
+      });
+    }
+
+    // For standard booking, check if booking has a user
     if (!booking.user || !booking.user._id) {
       console.error('❌ Booking does not have a user:', {
         bookingId: booking._id?.toString(),
@@ -244,12 +307,57 @@ export const getAllGuarantorRequests = async (req, res) => {
       query.booking = bookingId;
     }
 
-    const requests = await GuarantorRequest.find(query)
+    let requests = await GuarantorRequest.find(query)
       .populate('user', 'name email phone')
       .populate('guarantor', 'name email phone guarantorId')
       .populate('booking', 'bookingId')
       .populate('requestedBy', 'name email')
       .sort({ createdAt: -1 });
+
+    // If querying for a specific booking and no requests found, check OutwardBooking
+    if (bookingId && requests.length === 0) {
+      try {
+        let outward = null;
+        if (mongoose.Types.ObjectId.isValid(bookingId)) {
+          outward = await OutwardBooking.findById(bookingId).populate('guarantor', 'name email phone guarantorId kycStatus');
+        }
+        if (!outward) {
+          outward = await OutwardBooking.findOne({ originalBookingId: bookingId }).populate('guarantor', 'name email phone guarantorId kycStatus');
+        }
+
+        if (outward && (outward.guarantor || outward.guarantorDetails?.guarantorId)) {
+          const gInfo = outward.guarantorDetails || {};
+          requests = [
+            {
+              _id: outward._id.toString(),
+              status: gInfo.invitationStatus || 'accepted',
+              booking: {
+                _id: outward._id,
+                bookingId: outward.originalBookingId,
+              },
+              user: {
+                name: outward.customerName,
+                email: outward.customerEmail,
+                phone: outward.customerPhone,
+              },
+              guarantor: outward.guarantor || {
+                name: gInfo.name,
+                email: gInfo.email,
+                phone: gInfo.phone,
+                guarantorId: gInfo.guarantorId,
+                kycStatus: gInfo.kycStatus || 'pending',
+              },
+              verificationStatus: gInfo.verificationStatus || 'verified',
+              createdAt: gInfo.invitationSentDate || outward.createdAt,
+              acceptedAt: gInfo.invitationAcceptedDate || outward.updatedAt,
+              verificationDate: gInfo.verificationDate || outward.updatedAt,
+            },
+          ];
+        }
+      } catch (outwardErr) {
+        console.error('Error checking OutwardBooking for guarantor requests:', outwardErr);
+      }
+    }
 
     res.json({
       success: true,
@@ -372,6 +480,30 @@ export const deleteGuarantorRequest = async (req, res) => {
         } catch (bookingError) {
           console.error('❌ Error removing guarantor from booking:', bookingError);
         }
+      }
+
+      // Check if this belongs to an OutwardBooking
+      const outwardTarget = bookingId || id;
+      try {
+        let outward = null;
+        if (mongoose.Types.ObjectId.isValid(outwardTarget)) {
+          outward = await OutwardBooking.findById(outwardTarget);
+        }
+        if (!outward) {
+          outward = await OutwardBooking.findOne({ originalBookingId: outwardTarget });
+        }
+        if (outward && (outward.guarantor || outward.guarantorDetails?.guarantorId)) {
+          outward.guarantor = null;
+          outward.guarantorDetails = null;
+          await outward.save();
+          console.log('✅ Removed guarantor from OutwardBooking directly:', outwardTarget);
+          return res.json({
+            success: true,
+            message: 'Guarantor removed successfully',
+          });
+        }
+      } catch (outwardDelErr) {
+        console.error('Error removing guarantor from OutwardBooking:', outwardDelErr);
       }
       
       return res.status(404).json({

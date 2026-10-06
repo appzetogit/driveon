@@ -552,9 +552,14 @@ export const generateInwardAgreementPDF = ({
     customerName = '',
     customerPhone = '',
     customerEmail = '',
+    customerAddress: rawCustomerAddress = '',
+    numberOfGuests = 1,
     licenseNumber = '',
+    isDlVerified = bookingDetails.isDlVerified || false,
     panNumber = '',
+    isPanVerified = bookingDetails.isPanVerified || bookingDetails.panVerified || false,
     aadhaarNumber = '',
+    isAadhaarVerified = bookingDetails.isAadhaarVerified || bookingDetails.aadhaarVerified || false,
     car = {},
     fromDate = '',
     toDate = '',
@@ -564,9 +569,15 @@ export const generateInwardAgreementPDF = ({
     totalPrice = 0,
     advanceAmount = 0,
     deposit = 0,
-    depositItemType = '',
-    depositItemName = '',
+    depositItemType = bookingDetails.depositItem?.itemType || '',
+    depositItemName: rawDepositItemName = '',
+    depositItemNumber: rawDepositItemNumber = '',
   } = bookingDetails;
+
+  const customerAddress = (rawCustomerAddress || bookingDetails.customerAddress || bookingDetails.address || '').trim();
+  const depositItemName = (rawDepositItemName || bookingDetails.depositItem?.itemName || '').trim();
+  const depositItemNumber = (rawDepositItemNumber || bookingDetails.depositItem?.itemNumber || '').trim();
+  const bookingId = (bookingDetails.id || bookingDetails.bookingId || bookingDetails.originalBookingId || '').toString().trim();
 
   const formatDateDisplay = (dateStr) => {
     if (!dateStr) return 'N/A';
@@ -589,14 +600,25 @@ export const generateInwardAgreementPDF = ({
 
   const termsList = Array.isArray(template?.terms) && template.terms.length > 0 ? template.terms : defaultTerms;
 
+  const agreementDateFormatted = verifiedAgreement?.verifiedAt
+    ? new Date(verifiedAgreement.verifiedAt).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : (fromDate && formatDateDisplay(fromDate) !== '-')
+      ? formatDateDisplay(fromDate)
+      : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
   const interpolate = (text) => {
     if (!text || typeof text !== 'string') return text || '';
-    const result = text
+    let result = text
+      .replace(/{{agreement_date}}/gi, agreementDateFormatted)
+      .replace(/{{booking_id}}/gi, bookingId ? `#${bookingId}` : 'N/A')
       .replace(/{{customer_name}}/gi, customerName || 'Customer')
       .replace(/{{customer_phone}}/gi, customerPhone || 'N/A')
       .replace(/{{customer_email}}/gi, customerEmail || 'N/A')
-      .replace(/{{license_number}}/gi, licenseNumber || 'Verified')
-      .replace(/{{pan_number}}/gi, panNumber || aadhaarNumber || 'Verified')
+      .replace(/{{customer_address}}/gi, customerAddress || 'N/A')
+      .replace(/{{number_of_guests}}/gi, `${numberOfGuests || 1} Member(s)`)
+      .replace(/{{guests_count}}/gi, `${numberOfGuests || 1}`)
+      .replace(/{{license_number}}/gi, licenseNumber || 'N/A')
+      .replace(/{{pan_number}}/gi, panNumber ? (isPanVerified ? `${panNumber} (Verified)` : panNumber) : (aadhaarNumber ? (isAadhaarVerified ? `${aadhaarNumber} (Verified)` : aadhaarNumber) : 'N/A'))
       .replace(/{{car_name}}/gi, car?.name || 'Vehicle')
       .replace(/{{car_number}}/gi, car?.registrationNumber || car?.carNumber || 'Assigned on Delivery')
       .replace(/{{from_date}}/gi, formatDateDisplay(fromDate))
@@ -606,7 +628,17 @@ export const generateInwardAgreementPDF = ({
       .replace(/{{total_price}}/gi, `Rs. ${totalPrice || 0}`)
       .replace(/{{advance_amount}}/gi, `Rs. ${advanceAmount || 0}`)
       .replace(/{{security_deposit}}/gi, `Rs. ${deposit || 0}`)
-      .replace(/{{deposit_item}}/gi, `${depositItemName || 'Vehicle'} (${depositItemType || 'Bike/Scooter'})`);
+      .replace(/{{deposit_item}}/gi, `${depositItemName || 'Vehicle'}${depositItemNumber ? ` [Reg: ${depositItemNumber}]` : ''} (${depositItemType || 'Bike/Scooter'})`);
+
+    // In case older agreement or text has unreplaced placeholders or "YUG TRAVELS"
+    if (result.includes('YUG TRAVELS') || result.includes('____________')) {
+      result = result
+        .replace(/YUG TRAVELS/gi, 'URBAN MOBILITY RENTALS PRIVATE LIMITED (DRIVEON)')
+        .replace(/GF-17, Saral Parivesh, IOC Road, Mansarovar Circle, Chandkheda, Ahmedabad-382424/gi, 'Floor No.: 4, Building No./Flat No.: 429-430, Name Of Premises/Building: Patel Avenue, Road/Street: Sarkhej Gandhi Nagar Highway, Locality/Sub Locality: Bodakdev, City/Town/Village: Ahmedabad, District: Ahmedabad, State: Gujarat, PIN Code: 380054')
+        .replace(/This Agreement is executed on ____________ 2026 at ____________________, India/gi, `This Agreement is executed on ${agreementDateFormatted} at Ahmedabad, Gujarat, India`)
+        .replace(/This Agreement is executed on ____________ [0-9]{4} at ____________________, India/gi, `This Agreement is executed on ${agreementDateFormatted} at Ahmedabad, Gujarat, India`);
+    }
+
     return result.replace(/₹/g, 'Rs. ').replace(/[\u20B9]/g, 'Rs. ');
   };
 
@@ -653,14 +685,22 @@ export const generateInwardAgreementPDF = ({
   doc.setLineWidth(0.3);
   doc.roundedRect(margin, refBoxY, contentWidth, 8.5, 1.5, 1.5, 'S');
 
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...primaryNavy);
-  doc.text(`Agreement Ref: ${agreementId || 'AGR-INW-001'}`, margin + 4, refBoxY + 5.5);
+  doc.text(`Ref: ${agreementId || 'AGR-INW-001'}`, margin + 3.5, refBoxY + 5.5);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...slateGray);
-  doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`, margin + 55, refBoxY + 5.5);
+  if (bookingId) {
+    doc.setTextColor(...accentBlue);
+    doc.text(`Booking: #${bookingId}`, margin + 44, refBoxY + 5.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...slateGray);
+    doc.text(`Date: ${agreementDateFormatted}`, margin + 92, refBoxY + 5.5);
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...slateGray);
+    doc.text(`Date: ${agreementDateFormatted}`, margin + 55, refBoxY + 5.5);
+  }
 
   // Status Badge on the right: DIGITALLY APPROVED VIA OTP
   const topBadgeW = 58;
@@ -687,7 +727,7 @@ export const generateInwardAgreementPDF = ({
   const colW = (contentWidth - 6) / 2;
   const leftX = margin;
   const rightX = margin + colW + 6;
-  const partyCardH = 36;
+  const partyCardH = 42;
 
   // --- Left Card: First Party ---
   doc.setFillColor(...lightBg);
@@ -701,20 +741,22 @@ export const generateInwardAgreementPDF = ({
   doc.setTextColor(...accentBlue);
   doc.text('FIRST PARTY (OWNER / ADMIN)', leftX + 4, y + 4.5);
 
-  let py = y + 11;
-  doc.setFontSize(8.5);
+  let py = y + 10.5;
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...darkText);
-  doc.text('Urban Mobility Rentals Pvt Ltd (DriveOn)', leftX + 4, py);
-  py += 4.5;
-  doc.setFontSize(7.5);
+  doc.text(template?.companyName || 'URBAN MOBILITY RENTALS PRIVATE LIMITED (DRIVEON)', leftX + 4, py);
+  py += 4.2;
+  doc.setFontSize(6.8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...slateGray);
-  doc.text('Fleet Operations & Custody Hub, Indore (M.P.)', leftX + 4, py);
-  py += 4.5;
-  doc.text('Contact: +91 99939 11855  |  support@driveon.in', leftX + 4, py);
-  py += 4.5;
-  doc.text('GSTIN / Reg: Operational Fleet Custody Portal', leftX + 4, py);
+  const compAddr = template?.companyAddress || 'Floor No.: 4, 429-430, Patel Avenue, Bodakdev, Ahmedabad, Gujarat - 380054';
+  const compAddrLines = doc.splitTextToSize(compAddr, colW - 8);
+  doc.text(compAddrLines.slice(0, 2), leftX + 4, py);
+  py += (Math.min(compAddrLines.length, 2) * 3.4) + 1.2;
+  doc.text(`Contact: ${template?.companyContact || '+91 7610416911 | driveon721@gmail.com'}`, leftX + 4, py);
+  py += 3.8;
+  doc.text('Jurisdiction: Ahmedabad, Gujarat • Regulated Bailment', leftX + 4, py);
 
   // --- Right Card: Second Party ---
   doc.setFillColor(...lightBg);
@@ -728,20 +770,31 @@ export const generateInwardAgreementPDF = ({
   doc.setTextColor(126, 34, 206);
   doc.text('SECOND PARTY (HIRER / CUSTOMER)', rightX + 4, y + 4.5);
 
-  py = y + 11;
-  doc.setFontSize(8.5);
+  py = y + 10.5;
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...darkText);
   doc.text(customerName || 'N/A', rightX + 4, py);
-  py += 4.5;
-  doc.setFontSize(7.5);
+  py += 4.2;
+  doc.setFontSize(6.8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...slateGray);
   doc.text(`Mobile: +91 ${customerPhone || 'N/A'}`, rightX + 4, py);
-  py += 4.5;
-  doc.text(`Email: ${customerEmail || 'N/A'}`, rightX + 4, py);
-  py += 4.5;
-  doc.text(`DL: ${licenseNumber || 'Verified'}  |  ID/PAN: ${panNumber || aadhaarNumber || 'Verified'}`, rightX + 4, py);
+  py += 3.8;
+  if (customerAddress) {
+    const custAddrLines = doc.splitTextToSize(`Addr: ${customerAddress}`, colW - 8);
+    doc.text(custAddrLines.slice(0, 2), rightX + 4, py);
+    py += (Math.min(custAddrLines.length, 2) * 3.4) + 1.2;
+  } else {
+    doc.text(`Email: ${customerEmail || 'N/A'}`, rightX + 4, py);
+    py += 3.8;
+  }
+  const idDocStr = panNumber 
+    ? `  |  PAN: ${panNumber}${isPanVerified ? ' (Verified)' : ''}` 
+    : aadhaarNumber 
+      ? `  |  Aadhaar: XXXX-XXXX-${aadhaarNumber.slice(-4)}${isAadhaarVerified ? ' (Verified)' : ''}` 
+      : '';
+  doc.text(`DL: ${licenseNumber || 'N/A'}${idDocStr}`, rightX + 4, py);
 
   y += partyCardH + 5;
 
@@ -808,7 +861,7 @@ export const generateInwardAgreementPDF = ({
 
   depY += 5;
   const collateralText = depositItemName
-    ? `• Physical Collateral Pledged: Hirer has pledged personal two-wheeler "${depositItemName}" (${depositItemType || 'Bike/Scooter'}) in custody of First Party until return.`
+    ? `• Physical Collateral Pledged: Hirer has pledged personal two-wheeler "${depositItemName}${depositItemNumber ? ` [Reg: ${depositItemNumber}]` : ''}" (${depositItemType || 'Bike/Scooter'}) in custody of First Party until return.`
     : '• Physical Collateral Held: No physical vehicle collateral pledged for this booking.';
   doc.text(collateralText, margin + 4, depY);
 
@@ -876,39 +929,77 @@ export const generateInwardAgreementPDF = ({
   doc.setTextColor(...slateGray);
   doc.text('Legal Binding: Digital agreement consent executed and verified under Section 10A of the Information Technology Act, 2000.', margin + 5, sealTextY);
 
-  // Page 1 Footer
-  doc.setFontSize(7.2);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...slateGray);
-  doc.text('Page 1 of 2  •  DriveOn Fleet Operations  •  Confidential Rental Agreement', pageWidth / 2, pageHeight - 7, { align: 'center' });
+  // Page 1 ends, subsequent pages dynamically generated
 
   // ==========================================
-  // PAGE 2: TERMS & CONDITIONS & SIGNATURES
+  // TERMS & CONDITIONS, PREAMBLE & SIGNATURES
   // ==========================================
+  const drawPageHeader = () => {
+    // Top Navy Decorative Bar
+    doc.setFillColor(...primaryNavy);
+    doc.rect(0, 0, pageWidth, 5, 'F');
+
+    // Mini Running Header
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...primaryNavy);
+    doc.text(`${(template?.companyName || 'DRIVEON').toUpperCase()} RENTAL AGREEMENT  •  REF: ${agreementId || 'AGR-INW-001'}`, margin, 11);
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...slateGray);
+    doc.text(`Customer: ${customerName} (+91 ${customerPhone})`, pageWidth - margin, 11, { align: 'right' });
+
+    doc.setDrawColor(...borderGray);
+    doc.setLineWidth(0.3);
+    doc.line(margin, 13.5, pageWidth - margin, 13.5);
+  };
+
+  const addNewTermsPage = () => {
+    doc.addPage();
+    drawPageHeader();
+    return 18;
+  };
+
   doc.addPage();
-
-  // Top Navy Decorative Bar
-  doc.setFillColor(...primaryNavy);
-  doc.rect(0, 0, pageWidth, 5, 'F');
-
-  // Page 2 Mini Running Header
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...primaryNavy);
-  doc.text(`DRIVEON RENTAL AGREEMENT  •  REF: ${agreementId || 'AGR-INW-001'}`, margin, 11);
-
-  doc.setFontSize(7.5);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...slateGray);
-  doc.text(`Customer: ${customerName} (+91 ${customerPhone})`, pageWidth - margin, 11, { align: 'right' });
-
-  doc.setDrawColor(...borderGray);
-  doc.setLineWidth(0.3);
-  doc.line(margin, 13.5, pageWidth - margin, 13.5);
-
+  drawPageHeader();
   y = 18;
 
+  // Custom Clauses / Preamble (if present)
+  if (template?.customClauses) {
+    let customText = interpolate(template.customClauses);
+    customText = customText.replace(/₹/g, 'Rs. ').replace(/[\u20B9]/g, 'Rs. ');
+    const customLines = doc.splitTextToSize(customText, contentWidth - 8);
+    const customBoxH = 8 + (customLines.length * 3.6);
+
+    if (y + customBoxH > pageHeight - 22) {
+      y = addNewTermsPage();
+    }
+
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.setDrawColor(203, 213, 225); // slate-300
+    doc.roundedRect(margin, y, contentWidth, customBoxH, 1.5, 1.5, 'FD');
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...primaryNavy);
+    doc.text('PREAMBLE & RECITALS:', margin + 4, y + 4.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...darkText);
+    let cy = y + 8.5;
+    customLines.forEach((cline) => {
+      doc.text(cline, margin + 4, cy);
+      cy += 3.6;
+    });
+
+    y += customBoxH + 4;
+  }
+
   // Terms Section Header
+  if (y + 12 > pageHeight - 20) {
+    y = addNewTermsPage();
+  }
   doc.setFillColor(...primaryNavy);
   doc.roundedRect(margin, y, contentWidth, 7, 1, 1, 'F');
   doc.setFontSize(8.5);
@@ -918,7 +1009,7 @@ export const generateInwardAgreementPDF = ({
 
   y += 11;
 
-  // Render all terms with wrapped text
+  // Render all terms with wrapped text and multi-page break check
   termsList.forEach((term, index) => {
     let rawTerm = interpolate(term);
     rawTerm = rawTerm.replace(/₹/g, 'Rs. ').replace(/[\u20B9]/g, 'Rs. ');
@@ -934,6 +1025,14 @@ export const generateInwardAgreementPDF = ({
       body = rawTerm.trim();
     }
 
+    doc.setFontSize(7.4);
+    const bodyLines = doc.splitTextToSize(body, contentWidth - 6);
+    const neededH = 3.8 + (bodyLines.length * 3.5) + 3;
+
+    if (y + neededH > pageHeight - 20) {
+      y = addNewTermsPage();
+    }
+
     // Term Title in Bold Navy
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
@@ -945,48 +1044,24 @@ export const generateInwardAgreementPDF = ({
     doc.setFontSize(7.4);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...darkText);
-    const bodyLines = doc.splitTextToSize(body, contentWidth - 6);
     bodyLines.forEach((line) => {
       doc.text(line, margin + 4, y);
-      y += 3.6;
+      y += 3.5;
     });
 
     y += 2.2;
   });
 
-  // Custom Clauses (if present)
-  if (template?.customClauses) {
-    y += 2;
-    let customText = interpolate(template.customClauses);
-    customText = customText.replace(/₹/g, 'Rs. ').replace(/[\u20B9]/g, 'Rs. ');
-    const customLines = doc.splitTextToSize(customText, contentWidth - 8);
-    const customBoxH = 8 + (customLines.length * 3.8);
-
-    doc.setFillColor(254, 243, 199); // amber-50
-    doc.setDrawColor(245, 158, 11); // amber-500
-    doc.roundedRect(margin, y, contentWidth, customBoxH, 1.5, 1.5, 'FD');
-
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(180, 83, 9); // amber-700
-    doc.text('SPECIAL CONDITIONS & NOTES:', margin + 4, y + 4.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...darkText);
-    let cy = y + 8.5;
-    customLines.forEach((cline) => {
-      doc.text(cline, margin + 4, cy);
-      cy += 3.8;
-    });
-
-    y += customBoxH + 4;
-  }
-
   // Formal Signatures Block
-  y = Math.max(y + 4, pageHeight - 56);
-
   const sigColW = (contentWidth - 8) / 2;
   const sigBoxH = 38;
+  const neededSigH = sigBoxH + 20;
+
+  if (y + neededSigH > pageHeight - 16) {
+    y = addNewTermsPage();
+  } else {
+    y = Math.max(y + 3, pageHeight - 56);
+  }
 
   // --- First Party Signature ---
   doc.setFillColor(...lightBg);
@@ -1001,7 +1076,7 @@ export const generateInwardAgreementPDF = ({
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...slateGray);
-  doc.text('For Urban Mobility Rentals Private Limited', margin + 4, y + 10);
+  doc.text(`For ${template?.companyName || 'Urban Mobility Rentals Private Limited (DriveOn)'}`, margin + 4, y + 10);
 
   doc.setDrawColor(203, 213, 225);
   doc.line(margin + 4, y + 27, margin + sigColW - 4, y + 27);
@@ -1080,10 +1155,15 @@ export const generateInwardAgreementPDF = ({
   doc.setTextColor(...slateGray);
   doc.text('This electronic agreement is valid and legally enforceable in India under the Information Technology Act, 2000 and the Indian Contract Act, 1872.', pageWidth / 2, pageHeight - 11, { align: 'center' });
 
-  // Page 2 Footer
-  doc.setFontSize(7.2);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Page 2 of 2  •  DriveOn Fleet Operations  •  Confidential Rental Agreement', pageWidth / 2, pageHeight - 7, { align: 'center' });
+  // Add consistent dynamic footers to all pages: Page X of Y
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7.2);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...slateGray);
+    doc.text(`Page ${i} of ${totalPages}  •  ${template?.companyName || 'DriveOn'} Fleet Operations  •  Confidential Rental Agreement`, pageWidth / 2, pageHeight - 7, { align: 'center' });
+  }
 
   // Save the PDF directly
   const safeRef = (agreementId || 'Agreement').replace(/[^a-zA-Z0-9_-]/g, '_');

@@ -7,6 +7,7 @@ import { FLEET_BOOKING_FILTERS } from '../constants/fleetConstants';
 import api from '../../services/api';
 import CompleteBookingModal from '../components/CompleteBookingModal';
 import InwardAgreementModal from '../components/InwardAgreementModal';
+import BookingGuarantorModal from '../../components/admin/bookings/BookingGuarantorModal';
 
 const RUPEE = '\u20B9';
 const DOT = '\u2022';
@@ -207,6 +208,11 @@ const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
                     <p className="text-lg font-black" style={{ color: colors.textPrimary }}>{booking.customerName}</p>
                     <p className="text-sm font-medium mt-1" style={{ color: colors.textSecondary }}>{booking.customerPhone || 'No Phone'}</p>
                     <p className="text-sm font-medium" style={{ color: colors.textSecondary }}>{booking.customerEmail || 'No Email'}</p>
+                    {booking.customerAddress && (
+                      <p className="text-xs font-medium text-gray-500 mt-1 max-w-sm">
+                        📍 {booking.customerAddress}
+                      </p>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -442,9 +448,10 @@ const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
                       <div className="p-4 rounded-xl border" style={{ borderColor: colors.borderMedium, backgroundColor: colors.backgroundSecondary }}>
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                           <div className="space-y-3 flex-1">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                               <InfoItem label="Vehicle Category" value={booking.depositItem.itemType || 'Bike / Motorcycle'} />
                               <InfoItem label="Bike / Scooter Model" value={booking.depositItem.itemName} valueClass="font-bold text-blue-600" />
+                              <InfoItem label="Vehicle Plate / Reg No" value={booking.depositItem.itemNumber || '-'} valueClass="font-mono font-bold text-gray-900" />
                               <InfoItem label="Custody Status" value={booking.depositItem.returnStatus === 'returned' ? 'Returned to Customer' : 'Held by Admin'} valueClass={booking.depositItem.returnStatus === 'returned' ? 'text-green-600 font-bold' : 'text-amber-600 font-bold'} />
                             </div>
 
@@ -490,12 +497,19 @@ const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
           open={showAgreementModal}
           onClose={() => setShowAgreementModal(false)}
           bookingDetails={{
+            id: booking.id || booking.originalBookingId || booking._id,
+            bookingId: booking.id || booking.originalBookingId || booking._id,
             customerName: booking.customerName,
             customerPhone: booking.customerPhone,
             customerEmail: booking.customerEmail,
+            customerAddress: booking.customerAddress || booking.address || '',
+            numberOfGuests: booking.numberOfGuests || 1,
             licenseNumber: booking.licenseNumber,
+            isDlVerified: booking.licenseVerified || booking.isDlVerified || false,
             panNumber: booking.panNumber,
+            isPanVerified: booking.panVerified || booking.isPanVerified || false,
             aadhaarNumber: booking.aadhaarNumber,
+            isAadhaarVerified: booking.aadhaarVerified || booking.isAadhaarVerified || false,
             car: car || {
               name: booking.carName,
               registrationNumber: displayCarNumber,
@@ -511,8 +525,10 @@ const BookingDetailsModal = ({ open, booking, cars = [], onClose }) => {
             advanceAmount: booking.advanceAmount,
             depositType: booking.depositType,
             deposit: booking.deposit,
-            depositItemType: booking.depositItem?.itemType,
-            depositItemName: booking.depositItem?.itemName,
+            depositItem: booking.depositItem,
+            depositItemType: booking.depositItem?.itemType || 'Bike / Motorcycle',
+            depositItemName: booking.depositItem?.itemName || '',
+            depositItemNumber: booking.depositItem?.itemNumber || booking.depositItemNumber || '',
           }}
           existingAgreement={
             booking.agreement || {
@@ -543,6 +559,8 @@ const FleetBookingsPage = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [completingBooking, setCompletingBooking] = useState(null);
   const [loadingId, setLoadingId] = useState(null);
+  const [showGuarantorModal, setShowGuarantorModal] = useState(false);
+  const [guarantorBooking, setGuarantorBooking] = useState(null);
 
   const handleCancelBooking = async (bookingId) => {
     if (!window.confirm('Are you sure you want to cancel this booking?')) return;
@@ -563,20 +581,20 @@ const FleetBookingsPage = () => {
   const renderStatusBadge = (status) => {
     if (status === 'completed') {
       return (
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 border border-blue-200 capitalize">
           Completed
         </span>
       );
     }
     if (status === 'cancelled') {
       return (
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-800 border border-red-200 capitalize">
           Cancelled
         </span>
       );
     }
     return (
-      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-800 border border-green-200 capitalize">
         Active
       </span>
     );
@@ -600,219 +618,285 @@ const FleetBookingsPage = () => {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4">
-        {filteredBookings.length === 0 ? (
-          <Card className="p-6">
-            <p style={{ color: colors.textSecondary }}>No bookings found.</p>
-          </Card>
-        ) : (
-          filteredBookings.map((b) => {
-            const totalPrice = Number(b.totalPrice || 0);
-            const paidAmount = Number(b.paidAmount || 0);
-            const dueAmount = Math.max(0, totalPrice - paidAmount);
-            const status = b.status || 'active';
+      {filteredBookings.length === 0 ? (
+        <Card className="p-8 text-center bg-white border border-gray-200 rounded-2xl">
+          <p className="text-gray-500 font-medium">No bookings found matching your filters.</p>
+        </Card>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[1700px]">
+              <thead>
+                <tr className="bg-gray-100/90 border-b border-gray-200 text-xs font-bold uppercase tracking-wider text-gray-600">
+                  <th className="py-3.5 px-4 w-[160px]">Booking ID</th>
+                  <th className="py-3.5 px-4 w-[210px]">Car</th>
+                  <th className="py-3.5 px-4 w-[200px]">Customer</th>
+                  <th className="py-3.5 px-4 w-[110px]">Status</th>
+                  <th className="py-3.5 px-4 w-[210px]">Trip Dates</th>
+                  <th className="py-3.5 px-4 w-[200px]">Verifications</th>
+                  <th className="py-3.5 px-4 w-[190px]">Payment Details</th>
+                  <th className="py-3.5 px-4 min-w-[460px]">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredBookings.map((b) => {
+                  const totalPrice = Number(b.totalPrice || 0);
+                  const paidAmount = Number(b.paidAmount || 0);
+                  const dueAmount = Math.max(0, totalPrice - paidAmount);
+                  const status = b.status || 'active';
+                  const bookingDateVal = b.createdAt || b.bookingDate;
 
-            return (
-              <Card
-                key={b.id}
-                className="p-5 border"
-                style={{ borderColor: colors.borderMedium, backgroundColor: colors.backgroundPrimary }}
-              >
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-
-                  {/* Left Column: Car & Customer details */}
-                  <div className="flex-1 space-y-2.5">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-bold" style={{ color: colors.textPrimary }}>
-                        {b.carName}
-                      </h3>
-                      <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
-                        #{b.id}
-                      </span>
-                      {renderStatusBadge(status)}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {b.customerImage ? (
-                        <img
-                          src={b.customerImage}
-                          alt={b.customerName}
-                          className="h-10 w-10 rounded-full object-cover border"
-                          style={{ borderColor: colors.borderMedium }}
-                        />
-                      ) : (
-                        <div
-                          className="h-10 w-10 rounded-full border flex items-center justify-center text-[10px] font-bold bg-gray-700"
-                          style={{ borderColor: colors.borderMedium, color: colors.textSecondary }}
-                        >
-                          N/A
+                  return (
+                    <tr
+                      key={b.id}
+                      className="hover:bg-purple-50/20 transition-colors align-middle"
+                    >
+                      {/* 1. BOOKING ID */}
+                      <td className="py-4 px-4">
+                        <div className="space-y-1">
+                          <span className="text-xs font-mono px-2 py-0.5 rounded font-bold bg-gray-100 text-gray-800 border border-gray-200 inline-block">
+                            #{b.id}
+                          </span>
+                          {bookingDateVal && (
+                            <p className="text-[11px] text-gray-500 leading-tight">
+                              Booked: {formatDateTime(bookingDateVal)}
+                            </p>
+                          )}
                         </div>
-                      )}
-                      <div>
-                        <p className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
-                          {b.customerName}
-                        </p>
-                        {b.customerPhone && (
-                          <p className="text-xs" style={{ color: colors.textSecondary }}>
-                            {b.customerPhone}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                      </td>
 
-                    <p className="text-sm" style={{ color: colors.textSecondary }}>
-                      Dates: <span style={{ color: colors.textPrimary }}>{formatDateStr(b.fromDate)} {b.startTime ? `(${formatTime12Hour(b.startTime)})` : ''} {ARROW} {formatDateStr(b.toDate)} {b.endTime ? `(${formatTime12Hour(b.endTime)})` : ''}</span>
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full border" style={{ borderColor: colors.borderMedium, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }}>
-                        Type: {b.carType}
-                      </span>
-                      {b.licenseVerified ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
-                          ✓ DL Verified
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
-                          DL Unverified
-                        </span>
-                      )}
-                      {b.panVerified ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
-                          ✓ PAN Verified
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
-                          PAN Unverified
-                        </span>
-                      )}
-                      {b.aadhaarNumber ? (
-                        b.aadhaarVerified ? (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
-                            ✓ Aadhaar Verified
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/20">
-                            Aadhaar Unverified
-                          </span>
-                        )
-                      ) : (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 border border-gray-500/30">
-                          Aadhaar Not Provided
-                        </span>
-                      )}
-                      {b.carType === 'inward' && (
-                        b.agreement?.status === 'verified' || b.agreement?.status === 'done' || b.agreement?.approvedByOtp ? (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                            ✓ Agreement Approved
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                            Agreement Pending
-                          </span>
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Middle Column: Payment Details */}
-                  <div className="w-full lg:w-64 p-4 rounded-xl border space-y-1.5" style={{ borderColor: colors.borderMedium, backgroundColor: colors.backgroundSecondary }}>
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Payment Status & Mode</p>
-                    <div className="flex justify-between text-sm">
-                      <span style={{ color: colors.textSecondary }}>Total Price:</span>
-                      {Number(b.discount || 0) > 0 ? (
-                        <div className="flex items-center gap-1">
-                          <span className="line-through text-xs text-gray-500">{formatCurrency(totalPrice + Number(b.discount || 0))}</span>
-                          <span className="font-bold text-blue-400">{formatCurrency(totalPrice)}</span>
-                        </div>
-                      ) : (
-                        <span className="font-bold" style={{ color: colors.textPrimary }}>{formatCurrency(totalPrice)}</span>
-                      )}
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span style={{ color: colors.textSecondary }}>Paid Amount:</span>
-                      <span className="font-semibold text-green-400">{formatCurrency(paidAmount)}</span>
-                    </div>
-                    {Number(b.deposit || 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span style={{ color: colors.textSecondary }}>Security Deposit:</span>
-                        <span className="font-bold text-purple-400">{formatCurrency(b.deposit)}</span>
-                      </div>
-                    )}
-                    {b.depositItem?.itemName && (
-                      <div className="flex flex-col gap-1 py-1.5 px-2 rounded-lg border text-xs" style={{ borderColor: 'rgba(59, 130, 246, 0.3)', backgroundColor: 'rgba(59, 130, 246, 0.08)' }}>
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="font-semibold text-blue-400 flex items-center gap-1 truncate">
-                            <span>🛵</span>
-                            <span className="truncate">{b.depositItem.itemName}</span>
-                          </span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${b.depositItem.returnStatus === 'returned' ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                            {b.depositItem.returnStatus === 'returned' ? 'Returned' : 'Deposited'}
+                      {/* 2. CAR */}
+                      <td className="py-4 px-4">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-bold text-gray-900 leading-snug">
+                            {b.carName}
+                          </h4>
+                          <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 capitalize">
+                            Type: {b.carType}
                           </span>
                         </div>
-                        {b.depositItem.itemNumber && (
-                          <span className="font-mono text-[10px] text-gray-400 uppercase">
-                            {b.depositItem.itemNumber}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm border-t pt-1.5" style={{ borderTopColor: colors.borderLight }}>
-                      <span style={{ color: colors.textSecondary }}>Due Amount:</span>
-                      <span className="font-bold text-orange-400">{formatCurrency(dueAmount)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs pt-1">
-                      <span className="px-1.5 py-0.5 rounded font-medium" style={{
-                        backgroundColor: dueAmount === 0 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(234, 179, 8, 0.2)',
-                        color: dueAmount === 0 ? '#4ade80' : '#facc15'
-                      }}>
-                        {dueAmount === 0 ? 'Fully Paid' : 'Pending Balance'}
-                      </span>
-                      <span style={{ color: colors.textSecondary }}>{b.paymentMode || 'Cash'}</span>
-                    </div>
-                  </div>
+                      </td>
 
-                  {/* Right Column: Actions */}
-                  <div className="w-full lg:w-48 flex flex-col gap-2 justify-center">
-                    {status === 'active' ? (
-                      <>
-                        <button
-                          onClick={() => setSelectedBooking(b)}
-                          className="w-full py-2 px-3 text-xs font-bold rounded-lg text-white transition-all bg-blue-600 hover:bg-blue-700"
-                        >
-                          View Details
-                        </button>
-                        <button
-                          onClick={() => setCompletingBooking(b)}
-                          disabled={loadingId === b.id}
-                          className="w-full py-2 px-3 text-xs font-bold rounded-lg text-white transition-all bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                        >
-                          Mark as Completed
-                        </button>
-                        <button
-                          onClick={() => handleCancelBooking(b.id)}
-                          disabled={loadingId === b.id}
-                          className="w-full py-2 px-3 text-xs font-bold rounded-lg text-white transition-all bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                        >
-                          Cancel Booking
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => setSelectedBooking(b)}
-                        className="w-full py-2 px-3 text-xs font-bold rounded-lg text-white transition-all bg-gray-600 hover:bg-gray-700"
-                      >
-                        View Details & Payment
-                      </button>
-                    )}
-                  </div>
+                      {/* 3. CUSTOMER */}
+                      <td className="py-4 px-4">
+                        <div className="flex items-start gap-2.5">
+                          {b.customerImage ? (
+                            <img
+                              src={b.customerImage}
+                              alt={b.customerName}
+                              className="h-9 w-9 rounded-full object-cover border border-gray-200 flex-shrink-0"
+                            />
+                          ) : (
+                            <div
+                              className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm"
+                              style={{ backgroundColor: colors.backgroundTertiary }}
+                            >
+                              {b.customerName?.charAt(0).toUpperCase() || 'C'}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-gray-900 truncate">
+                              {b.customerName}
+                            </p>
+                            {b.customerPhone && (
+                              <p className="text-xs text-gray-600 font-medium">
+                                📞 {b.customerPhone}
+                              </p>
+                            )}
+                            {b.customerEmail && (
+                              <p className="text-[11px] text-gray-400 truncate max-w-[150px]">
+                                {b.customerEmail}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
 
-                </div>
-              </Card>
-            );
-          })
-        )}
-      </div>
+                      {/* 4. STATUS */}
+                      <td className="py-4 px-4">
+                        {renderStatusBadge(status)}
+                      </td>
+
+                      {/* 5. TRIP DATES */}
+                      <td className="py-4 px-4">
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-gray-400 text-[10px] uppercase font-bold w-10 flex-shrink-0">Start:</span>
+                            <span className="font-semibold text-gray-800">
+                              {formatDateStr(b.fromDate)} {b.startTime ? `(${formatTime12Hour(b.startTime)})` : ''}
+                            </span>
+                          </div>
+                          <div className="flex items-start gap-1.5">
+                            <span className="text-gray-400 text-[10px] uppercase font-bold w-10 flex-shrink-0">End:</span>
+                            <span className="font-semibold text-gray-800">
+                              {formatDateStr(b.toDate)} {b.endTime ? `(${formatTime12Hour(b.endTime)})` : ''}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 6. VERIFICATIONS */}
+                      <td className="py-4 px-4">
+                        <div className="flex flex-wrap gap-1">
+                          {b.licenseVerified ? (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">
+                              ✓ DL Verified
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+                              DL Unverified
+                            </span>
+                          )}
+                          {b.panVerified ? (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">
+                              ✓ PAN Verified
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+                              PAN Unverified
+                            </span>
+                          )}
+                          {b.aadhaarNumber ? (
+                            b.aadhaarVerified ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-50 text-green-700 border border-green-200">
+                                ✓ Aadhaar Verified
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
+                                Aadhaar Unverified
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-50 text-gray-500 border border-gray-200">
+                              No Aadhaar
+                            </span>
+                          )}
+                          {b.carType === 'inward' && (
+                            b.agreement?.status === 'verified' || b.agreement?.status === 'done' || b.agreement?.approvedByOtp ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                ✓ Agreement Approved
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                Agreement Pending
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 7. PAYMENT STATUS */}
+                      <td className="py-4 px-4">
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-500">Total:</span>
+                            <span className="font-bold text-gray-900">{formatCurrency(totalPrice)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-500">Paid:</span>
+                            <span className="font-semibold text-green-600">{formatCurrency(paidAmount)}</span>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-gray-100 pt-0.5">
+                            <span className="text-gray-500">Due:</span>
+                            <span className="font-bold text-orange-600">{formatCurrency(dueAmount)}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-1 pt-1">
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                dueAmount === 0 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                              }`}
+                            >
+                              {dueAmount === 0 ? 'Fully Paid' : 'Pending Balance'}
+                            </span>
+                            <span className="text-[11px] text-gray-500 font-medium">{b.paymentMode || 'Cash'}</span>
+                          </div>
+                          {b.depositItem?.itemName && (
+                            <div className="mt-1 px-1.5 py-0.5 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-700 font-medium flex items-center justify-between">
+                              <span className="truncate">🛵 {b.depositItem.itemName}</span>
+                              <span className="font-bold ml-1">{b.depositItem.returnStatus === 'returned' ? 'Returned' : 'Deposited'}</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 8. ACTIONS */}
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap">
+                          {status === 'active' ? (
+                            <>
+                              <button
+                                onClick={() => setSelectedBooking(b)}
+                                className="py-1.5 px-3 text-xs font-semibold rounded-lg text-white transition-all bg-blue-600 hover:bg-blue-700 shadow-sm whitespace-nowrap"
+                              >
+                                View Details
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGuarantorBooking(b);
+                                  setShowGuarantorModal(true);
+                                }}
+                                className="py-1.5 px-3 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 shadow-sm whitespace-nowrap"
+                                style={{
+                                  backgroundColor: '#f5f3ff',
+                                  color: colors.backgroundTertiary,
+                                  border: '1px solid #ddd6fe',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                👥 {b.guarantorDetails?.name || b.guarantor?.name ? `Guarantor: ${b.guarantorDetails?.name || b.guarantor?.name}` : 'Guarantor'}
+                              </button>
+                              <button
+                                onClick={() => setCompletingBooking(b)}
+                                disabled={loadingId === b.id}
+                                className="py-1.5 px-3 text-xs font-semibold rounded-lg text-white transition-all bg-green-600 hover:bg-green-700 disabled:opacity-50 shadow-sm whitespace-nowrap"
+                              >
+                                Mark Complete
+                              </button>
+                              <button
+                                onClick={() => handleCancelBooking(b.id)}
+                                disabled={loadingId === b.id}
+                                className="py-1.5 px-3 text-xs font-semibold rounded-lg text-white transition-all bg-red-600 hover:bg-red-700 disabled:opacity-50 shadow-sm whitespace-nowrap"
+                              >
+                                Cancel Booking
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setSelectedBooking(b)}
+                                className="py-1.5 px-3 text-xs font-semibold rounded-lg text-white transition-all bg-gray-600 hover:bg-gray-700 shadow-sm whitespace-nowrap"
+                              >
+                                View Details & Payment
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGuarantorBooking(b);
+                                  setShowGuarantorModal(true);
+                                }}
+                                className="py-1.5 px-3 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 shadow-sm whitespace-nowrap"
+                                style={{
+                                  backgroundColor: '#f5f3ff',
+                                  color: colors.backgroundTertiary,
+                                  border: '1px solid #ddd6fe',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                👥 {b.guarantorDetails?.name || b.guarantor?.name ? `Guarantor: ${b.guarantorDetails?.name || b.guarantor?.name}` : 'Guarantor'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {selectedBooking && (
         <BookingDetailsModal
@@ -828,6 +912,26 @@ const FleetBookingsPage = () => {
           booking={completingBooking}
           onClose={() => setCompletingBooking(null)}
           onConfirm={(updatedData) => updateBookingInContext(completingBooking.id, updatedData)}
+        />
+      )}
+
+      {showGuarantorModal && guarantorBooking && (
+        <BookingGuarantorModal
+          isOpen={showGuarantorModal}
+          onClose={() => {
+            setShowGuarantorModal(false);
+            setGuarantorBooking(null);
+          }}
+          booking={guarantorBooking}
+          bookingType="inward"
+          onGuarantorUpdated={({ bookingId, guarantorId, removed }) => {
+            if (updateBookingInContext) {
+              updateBookingInContext(guarantorBooking.id, {
+                guarantor: removed ? null : guarantorId,
+                guarantorDetails: removed ? null : { name: guarantorId },
+              });
+            }
+          }}
         />
       )}
     </div>

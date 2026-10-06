@@ -295,6 +295,11 @@ const FleetAgreementsPage = () => {
                         {booking.depositItem?.itemName ? (
                           <span className="font-bold text-blue-500 block">
                             🛵 {booking.depositItem.itemName}
+                            {booking.depositItem.itemNumber ? (
+                              <span className="text-xs font-mono font-semibold text-gray-700 ml-1">
+                                [{booking.depositItem.itemNumber}]
+                              </span>
+                            ) : null}
                           </span>
                         ) : null}
                         {!booking.deposit && !booking.depositItem?.itemName && (
@@ -342,24 +347,33 @@ const FleetAgreementsPage = () => {
           open={Boolean(selectedBookingForAgreement)}
           onClose={() => setSelectedBookingForAgreement(null)}
           bookingDetails={{
+            id: selectedBookingForAgreement.id || selectedBookingForAgreement.originalBookingId || selectedBookingForAgreement._id,
+            bookingId: selectedBookingForAgreement.id || selectedBookingForAgreement.originalBookingId || selectedBookingForAgreement._id,
             customerName: selectedBookingForAgreement.customerName,
             customerPhone: selectedBookingForAgreement.customerPhone,
             customerEmail: selectedBookingForAgreement.customerEmail,
+            customerAddress: selectedBookingForAgreement.customerAddress || selectedBookingForAgreement.address || '',
+            numberOfGuests: selectedBookingForAgreement.numberOfGuests || 1,
             licenseNumber: selectedBookingForAgreement.licenseNumber,
+            isDlVerified: selectedBookingForAgreement.licenseVerified || selectedBookingForAgreement.isDlVerified || false,
             panNumber: selectedBookingForAgreement.panNumber,
+            isPanVerified: selectedBookingForAgreement.panVerified || selectedBookingForAgreement.isPanVerified || false,
             aadhaarNumber: selectedBookingForAgreement.aadhaarNumber,
+            isAadhaarVerified: selectedBookingForAgreement.aadhaarVerified || selectedBookingForAgreement.isAadhaarVerified || false,
             car: selectedBookingForAgreement.car,
             fromDate: selectedBookingForAgreement.fromDate,
             toDate: selectedBookingForAgreement.toDate,
             startTime: selectedBookingForAgreement.startTime || '10:00 AM',
             endTime: selectedBookingForAgreement.endTime || '10:00 AM',
-            numberOfDays: 1,
+            numberOfDays: selectedBookingForAgreement.numberOfDays || 1,
             totalPrice: selectedBookingForAgreement.totalPrice,
             advanceAmount: selectedBookingForAgreement.advanceAmount,
             depositType: selectedBookingForAgreement.depositType,
             deposit: selectedBookingForAgreement.deposit,
-            depositItemType: selectedBookingForAgreement.depositItem?.itemType,
-            depositItemName: selectedBookingForAgreement.depositItem?.itemName,
+            depositItem: selectedBookingForAgreement.depositItem,
+            depositItemType: selectedBookingForAgreement.depositItem?.itemType || 'Bike / Motorcycle',
+            depositItemName: selectedBookingForAgreement.depositItem?.itemName || '',
+            depositItemNumber: selectedBookingForAgreement.depositItem?.itemNumber || selectedBookingForAgreement.depositItemNumber || '',
           }}
           existingAgreement={selectedBookingForAgreement.agreement}
           isAlreadyDone={Boolean(
