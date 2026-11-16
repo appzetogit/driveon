@@ -259,9 +259,12 @@ export const verifyDL = async (req, res) => {
           data: result.data
         });
       } else {
-        return res.status(400).json({
+        const upstreamDown = result.status_code >= 500;
+        return res.status(upstreamDown ? 503 : 400).json({
           success: false,
-          message: result.message || 'DL Verification failed',
+          message: upstreamDown
+            ? 'DL verification service is temporarily unavailable. Please try again later.'
+            : (result.message || 'DL Verification failed'),
           error: result
         });
       }

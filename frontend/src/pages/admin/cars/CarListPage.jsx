@@ -184,6 +184,13 @@ const CarListPage = () => {
             rating: car.rating || 5,
             totalBookings,
             totalRevenue: car.totalRevenue || 0,
+            vendorAgreementType: car.vendorAgreementType,
+            agreementPricePerDay: car.agreementPricePerDay || 0,
+            agreementPricePerMonth: car.agreementPricePerMonth || 0,
+            settlementAmount: car.settlementAmount || 0,
+            vendorCost: car.vendorCost || 0,
+            profit: car.profit ?? 0,
+            pendingAmount: car.pendingAmount || 0,
             features: car.features || [],
             registrationDate: car.createdAt || new Date().toISOString(),
             registrationNumber: car.carNumber || car.registrationNumber || '',
@@ -1238,6 +1245,33 @@ const CarDetailModal = ({ car, onClose, onEdit, onApprove, onReject, onSuspend, 
                       <label className="text-xs font-medium text-gray-700">Registration Date</label>
                       <p className="text-sm text-gray-900">{new Date(car.registrationDate).toLocaleDateString()}</p>
                     </div>
+                    {car.source === 'outward' && (
+                      <>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Vendor Deal</label>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {car.settlementAmount
+                              ? `₹${car.settlementAmount.toLocaleString('en-IN')} (Settled)`
+                              : car.vendorAgreementType === 'monthly'
+                                ? `₹${car.agreementPricePerMonth.toLocaleString('en-IN')} / Month (Fixed)`
+                                : `₹${car.agreementPricePerDay.toLocaleString('en-IN')} / Day`}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Vendor Cost</label>
+                          <p className="text-sm font-semibold text-gray-900">₹{car.vendorCost.toLocaleString('en-IN')}</p>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">{car.profit >= 0 ? 'Profit' : 'Loss'}</label>
+                          <p className={`text-sm font-bold ${car.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {car.profit >= 0 ? '+' : '-'}₹{Math.abs(car.profit).toLocaleString('en-IN')}
+                          </p>
+                          {car.pendingAmount > 0 && (
+                            <p className="text-xs text-amber-600">₹{car.pendingAmount.toLocaleString('en-IN')} still to collect</p>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

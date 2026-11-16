@@ -152,15 +152,14 @@ const EditCarPage = () => {
             isAvailable: car.isAvailable !== undefined ? car.isAvailable : true,
           });
 
-          if (car.source === 'outward') {
-            const outward = response.data.outward || {};
-            setVendorInfo({
-              vendorId: outward.vendorId || '',
-              vendorAgreementType: outward.vendorAgreementType || 'daily',
-              agreementPricePerDay: outward.agreementPricePerDay || '',
-              agreementPricePerMonth: outward.agreementPricePerMonth || '',
-            });
-          }
+          // Admin cars are always vendor-owned; older owner-added cars get linked to a vendor on save
+          const outward = response.data.outward || {};
+          setVendorInfo({
+            vendorId: outward.vendorId || '',
+            vendorAgreementType: outward.vendorAgreementType || 'daily',
+            agreementPricePerDay: outward.agreementPricePerDay || '',
+            agreementPricePerMonth: outward.agreementPricePerMonth || '',
+          });
 
           // Set existing images
           setExistingImages(car.images || []);
@@ -429,31 +428,7 @@ const EditCarPage = () => {
               <h2 className="text-lg font-semibold mb-4" style={{ color: colors.backgroundTertiary }}>
                 Owner Information
               </h2>
-              {vendorInfo ? (
-                <VendorOwnerFields value={vendorInfo} onChange={setVendorInfo} />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
-                  <Input
-                    label="Owner Name *"
-                    placeholder="Enter owner full name (e.g., John Doe)"
-                    error={errors.ownerName?.message}
-                    {...register('ownerName')}
-                  />
-                  <Input
-                    label="Owner Email *"
-                    placeholder="Enter owner email (e.g., john@example.com)"
-                    error={errors.ownerEmail?.message}
-                    {...register('ownerEmail')}
-                  />
-                  <Input
-                    label="Owner ID *"
-                    placeholder="Enter or edit Owner ID"
-                    error={errors.ownerId?.message}
-                    {...register('ownerId')}
-                    helperText="You can update the Owner ID if needed"
-                  />
-                </div>
-              )}
+              {vendorInfo && <VendorOwnerFields value={vendorInfo} onChange={setVendorInfo} />}
             </Card>
 
             {/* Car Type & Specifications */}

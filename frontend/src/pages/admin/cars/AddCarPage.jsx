@@ -77,7 +77,7 @@ const vendorCarFormSchema = carFormSchema.extend({
 const AddCarPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [ownerType, setOwnerType] = useState('owner'); // 'owner' | 'vendor'
+  const [ownerType] = useState('vendor'); // admin cars are always vendor-owned
   const [vendorInfo, setVendorInfo] = useState(emptyVendorInfo);
   const [selectedImages, setSelectedImages] = useState([]);
   const [rcDocument, setRcDocument] = useState(null);
@@ -352,56 +352,10 @@ const AddCarPage = () => {
 
             {/* Owner Information */}
             <Card className="p-4 md:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h2 className="text-lg font-semibold" style={{ color: colors.backgroundTertiary }}>
-                  Owner Information
-                </h2>
-                <div className="flex p-1 rounded-lg bg-gray-100 border border-gray-200">
-                  {[
-                    { value: 'owner', label: 'By Owner' },
-                    { value: 'vendor', label: 'By Vendor' },
-                  ].map((tab) => (
-                    <button
-                      key={tab.value}
-                      type="button"
-                      onClick={() => setOwnerType(tab.value)}
-                      className={`py-1.5 px-4 rounded-md text-sm font-semibold transition-all ${
-                        ownerType === tab.value ? 'bg-white shadow-sm' : 'text-gray-500 hover:text-gray-800'
-                      }`}
-                      style={{ color: ownerType === tab.value ? colors.backgroundTertiary : undefined }}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {ownerType === 'vendor' ? (
-                <VendorOwnerFields value={vendorInfo} onChange={setVendorInfo} />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
-                  <Input
-                    label="Owner Name *"
-                    placeholder="Enter owner full name (e.g., John Doe)"
-                    error={errors.ownerName?.message}
-                    {...register('ownerName')}
-                  />
-                  <Input
-                    label="Owner Email *"
-                    placeholder="Enter owner email (e.g., john@example.com)"
-                    error={errors.ownerEmail?.message}
-                    {...register('ownerEmail')}
-                  />
-                  <Input
-                    label="Owner ID *"
-                    placeholder="Auto-generated Owner ID"
-                    error={errors.ownerId?.message}
-                    readOnly
-                    {...register('ownerId')}
-                    className="bg-gray-50"
-                    helperText="This ID is automatically generated"
-                  />
-                </div>
-              )}
+              <h2 className="text-lg font-semibold mb-4" style={{ color: colors.backgroundTertiary }}>
+                Owner Information
+              </h2>
+              <VendorOwnerFields value={vendorInfo} onChange={setVendorInfo} />
             </Card>
 
             {/* Car Type & Specifications */}

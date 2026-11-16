@@ -10,6 +10,8 @@ import { uploadImage, isConfigured } from '../services/cloudinary.service.js';
 import quickekycService from '../services/quickekyc.service.js';
 import { createAdminNotification } from './notification.controller.js';
 import { generateOTP, sendOTP } from '../utils/otp.service.js';
+import { getOutwardCarTrips, summarizeOutwardTrips } from '../utils/vendorCost.js';
+import { syncShadowCar } from '../utils/shadowCar.js';
 
 // Initialize Razorpay instance if keys are available
 const getRazorpayInstance = () => {
@@ -27,110 +29,12 @@ export const getOutwardCars = async (req, res) => {
     try {
         const cars = await OutwardCar.find().sort({ createdAt: -1 });
 
-        // Calculate bookings and revenue stats dynamically
-        const carIds = cars.map(c => c.originalOutputId).filter(Boolean);
-        const outwardBookingAggregation = await OutwardBooking.aggregate([
-            { $match: { carId: { $in: carIds }, status: { $ne: 'cancelled' } } },
-            {
-                $group: {
-                    _id: '$carId',
-                    count: { $sum: 1 },
-                    revenue: {
-                        $sum: { $ifNull: ['$paidAmount', 0] }
-                    }
-                }
-            }
-        ]);
-
-        const bookingStatsMap = {};
-        outwardBookingAggregation.forEach(stat => {
-            if (stat._id) {
-                bookingStatsMap[stat._id.toString()] = {
-                    count: stat.count,
-                    revenue: stat.revenue
-                };
-            }
-        });
-
-        // Also fetch bookings from the standard Booking collection for replicated Cars
-        const standardCars = await Car.find({ outwardCarId: { $in: carIds } });
-        const standardCarMap = {}; // standardCar._id.toString() -> outwardCarId
-        const standardCarIds = [];
-        standardCars.forEach(sc => {
-            standardCarMap[sc._id.toString()] = sc.outwardCarId;
-            standardCarIds.push(sc._id);
-        });
-
-        if (standardCarIds.length > 0) {
-            // Standard Booking collection (shadow car inward bookings)
-            const standardBookingAggregation = await mongoose.model('Booking').aggregate([
-                {
-                    $match: {
-                        car: { $in: standardCarIds },
-                        status: { $nin: ['cancelled', 'rejected'] }
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$car',
-                        count: { $sum: 1 },
-                        revenue: {
-                            $sum: { $ifNull: ['$paidAmount', 0] }
-                        }
-                    }
-                }
-            ]);
-
-            standardBookingAggregation.forEach(stat => {
-                if (stat._id) {
-                    const outwardCarId = standardCarMap[stat._id.toString()];
-                    if (outwardCarId) {
-                        if (!bookingStatsMap[outwardCarId]) {
-                            bookingStatsMap[outwardCarId] = { count: 0, revenue: 0 };
-                        }
-                        bookingStatsMap[outwardCarId].count += stat.count;
-                        bookingStatsMap[outwardCarId].revenue += stat.revenue;
-                    }
-                }
-            });
-
-            // OutwardBooking collection keyed by shadow car _id (fleet bookings stored with shadowCar._id as carId)
-            const shadowCarIdStrings = standardCarIds.map(id => id.toString());
-            const shadowOutwardBookingAggregation = await OutwardBooking.aggregate([
-                {
-                    $match: {
-                        carId: { $in: shadowCarIdStrings },
-                        status: { $ne: 'cancelled' }
-                    }
-                },
-                {
-                    $group: {
-                        _id: '$carId',
-                        count: { $sum: 1 },
-                        revenue: {
-                            $sum: { $ifNull: ['$paidAmount', 0] }
-                        }
-                    }
-                }
-            ]);
-
-            shadowOutwardBookingAggregation.forEach(stat => {
-                if (stat._id) {
-                    const outwardCarId = standardCarMap[stat._id];
-                    if (outwardCarId) {
-                        if (!bookingStatsMap[outwardCarId]) {
-                            bookingStatsMap[outwardCarId] = { count: 0, revenue: 0 };
-                        }
-                        bookingStatsMap[outwardCarId].count += stat.count;
-                        bookingStatsMap[outwardCarId].revenue += stat.revenue;
-                    }
-                }
-            });
-        }
+        // Same trip stats as the CRM vendor pages (shared helper)
+        const statsList = await Promise.all(cars.map(async (car) => summarizeOutwardTrips(car, await getOutwardCarTrips(car))));
 
         // Map backend format back to frontend expected structure
-        const formattedCars = cars.map(car => {
-            const stats = bookingStatsMap[car.originalOutputId] || { count: 0, revenue: 0 };
+        const formattedCars = cars.map((car, i) => {
+            const stats = statsList[i];
             return {
                 id: car.originalOutputId,
                 name: car.name,
@@ -144,8 +48,12 @@ export const getOutwardCars = async (req, res) => {
                 type: car.type,
                 ownerName: car.ownerName,
                 ownerPhone: car.ownerPhone,
-                totalBookings: stats.count,
-                totalRevenue: stats.revenue,
+                totalBookings: stats.tripsCount,
+                totalRevenue: stats.totalRevenue,
+                pendingAmount: stats.pendingAmount,
+                settlementAmount: car.vendorSettlement?.agreedAmount || 0,
+                vendorCost: stats.totalVendorCost,
+                profit: stats.netProfit,
                 image: car.image || '',
                 rating: car.rating || 5,
                 carNumber: car.carNumber || car.registrationNumber || '',
@@ -163,62 +71,7 @@ export const getOutwardCars = async (req, res) => {
 // Helper to replicate OutwardCar to standard Car collection for user side visibility and booking
 const syncToStandardCar = async (outwardCar) => {
     try {
-        let shadowCar = await Car.findOne({ outwardCarId: outwardCar.originalOutputId });
-
-        // Resolve an existing admin or user as owner to satisfy the required Car.owner validation
-        const adminUser = await mongoose.model('User').findOne({ role: 'admin' }) || await mongoose.model('User').findOne({});
-        const ownerId = adminUser ? adminUser._id : new mongoose.Types.ObjectId('60d5ec0f1f1d2c001f8e29a5');
-
-        let isCarInRepair = false;
-        if (shadowCar) {
-            const RepairJob = mongoose.model('RepairJob');
-            const activeRepair = await RepairJob.findOne({ car: shadowCar._id, status: { $nin: ['Completed', 'Cancelled'] } });
-            if (activeRepair) {
-                isCarInRepair = true;
-            }
-        }
-
-        const carData = {
-            owner: ownerId,
-            brand: outwardCar.brand || 'External',
-            model: outwardCar.model || 'Vehicle',
-            year: 2024,
-            color: 'N/A',
-            registrationNumber: outwardCar.carNumber || outwardCar.registrationNumber || `OUT-${outwardCar.originalOutputId.slice(-6).toUpperCase()}`,
-            carType: 'suv', // default valid enum
-            fuelType: 'petrol', // default valid enum
-            transmission: 'automatic', // default valid enum
-            seatingCapacity: 5,
-            pricePerDay: outwardCar.pricePerDay || 1000,
-            pricePerWeek: (outwardCar.pricePerDay || 1000) * 7,
-            pricePerMonth: (outwardCar.pricePerDay || 1000) * 30,
-            securityDeposit: 0,
-            description: `This verified premium outward car is owned by ${outwardCar.ownerName} and managed by DriveOn partners.`,
-            isAvailable: isCarInRepair ? false : true,
-            status: 'active',
-            images: outwardCar.image ? [{ url: outwardCar.image, isPrimary: true }] : [],
-            location: {
-                city: outwardCar.location || 'Indore',
-                state: 'Madhya Pradesh',
-                address: outwardCar.location || 'Indore'
-            },
-            ownerInfo: {
-                name: outwardCar.ownerName,
-                email: 'partner@driveon.com',
-                phone: outwardCar.ownerPhone
-            },
-            ownerName: outwardCar.ownerName,
-            source: 'outward',
-            outwardCarId: outwardCar.originalOutputId,
-            features: outwardCar.features || []
-        };
-
-        if (shadowCar) {
-            Object.assign(shadowCar, carData);
-            await shadowCar.save();
-        } else {
-            await Car.create(carData);
-        }
+        await syncShadowCar(outwardCar);
     } catch (err) {
         console.error('Error in syncToStandardCar helper:', err);
     }
@@ -793,9 +646,12 @@ export const verifyFleetDL = async (req, res) => {
                     data: result.data
                 });
             } else {
-                return res.status(400).json({
+                const upstreamDown = result.status_code >= 500;
+                return res.status(upstreamDown ? 503 : 400).json({
                     success: false,
-                    message: result.message || 'DL Verification failed',
+                    message: upstreamDown
+                        ? 'DL verification service is temporarily unavailable. Please try again later.'
+                        : (result.message || 'DL Verification failed'),
                     error: result
                 });
             }

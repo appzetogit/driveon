@@ -405,7 +405,7 @@ const VendorLedgerModal = ({ vendor, isOpen, onClose }) => {
                                                             <p className="text-base font-extrabold text-emerald-600">{fmt(car.totalRevenue)}</p>
                                                         </div>
                                                         <div className="p-3 text-center">
-                                                            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Vendor Total Profit</p>
+                                                            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Total Vendor Due</p>
                                                             <p className="text-base font-extrabold text-gray-600">{fmt(car.totalVendorCost)}</p>
                                                         </div>
                                                         <div className="p-3 text-center">
@@ -462,6 +462,12 @@ const VendorLedgerModal = ({ vendor, isOpen, onClose }) => {
                                                                                                     ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                                                                                                     : 'bg-purple-50 text-purple-600 border-purple-100'
                                                                                                 }`}>{trip.source}</span>
+                                                                                            {trip.bookingType && (
+                                                                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border uppercase ${trip.bookingType === 'inward'
+                                                                                                        ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                                                                        : 'bg-orange-50 text-orange-600 border-orange-100'
+                                                                                                    }`}>{trip.bookingType}</span>
+                                                                                            )}
                                                                                         </div>
                                                                                         <span className="font-extrabold text-sm text-[#212c40]">
                                                                                             ₹{(trip.adminRevenue || 0).toLocaleString('en-IN')}
@@ -517,7 +523,7 @@ const VendorLedgerModal = ({ vendor, isOpen, onClose }) => {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-xs text-gray-400">Total Profit</p>
+                                                    <p className="text-xs text-gray-400">Total Vendor Due</p>
                                                     <p className="font-bold text-gray-700">{fmt(summary.totalVendorCost)}</p>
                                                 </div>
                                             </div>
@@ -586,6 +592,10 @@ const VendorLedgerModal = ({ vendor, isOpen, onClose }) => {
                                                                 {txn.relatedCarLabel && (
                                                                     <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-bold text-gray-700">
                                                                         {txn.relatedCarLabel}
+                                                                        {(() => {
+                                                                            const reg = cars.find((c) => String(c.id) === String(txn.relatedCarId))?.registrationNumber;
+                                                                            return reg && reg !== 'N/A' ? ` (${reg})` : '';
+                                                                        })()}
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -705,6 +715,7 @@ const VendorLedgerModal = ({ vendor, isOpen, onClose }) => {
                                                 {cars.map((car) => (
                                                     <option key={`${car.type}-${car.id}`} value={`${car.type}::${car.id}`}>
                                                         {car.brand} {car.model}
+                                                        {car.registrationNumber && car.registrationNumber !== 'N/A' && ` (${car.registrationNumber})`}
                                                     </option>
                                                 ))}
                                             </select>

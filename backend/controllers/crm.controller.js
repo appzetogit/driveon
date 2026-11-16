@@ -21,6 +21,7 @@ import Vendor from '../models/Vendor.js';
 import OutwardCar from '../models/OutwardCar.js';
 import VendorTransaction from '../models/VendorTransaction.js';
 import VendorHistory from '../models/VendorHistory.js';
+import { getOutwardCarTrips, summarizeOutwardTrips } from '../utils/vendorCost.js';
 import Transaction from '../models/Transaction.js';
 import Invoice from '../models/Invoice.js';
 import ExpenseCategory from '../models/ExpenseCategory.js';
@@ -2419,62 +2420,8 @@ export const onboardVendor = async (req, res) => {
 };
 
 const buildOutwardCarStats = async (outwardCar, vendorId) => {
-    let allBookings = [];
-
-    // 1. Fetch manual outward bookings from fleet portal
-    const outwardBookings = await mongoose.model('OutwardBooking').find({
-        carId: outwardCar.originalOutputId,
-        status: { $ne: 'cancelled' }
-    }).lean();
-
-    outwardBookings.forEach(b => {
-        const from = new Date(b.fromDate);
-        const to = new Date(b.toDate);
-        const timeDiff = to.getTime() - from.getTime();
-        const days = Math.ceil(timeDiff / (1000 * 3600 * 24)) || 1;
-        
-        allBookings.push({
-            days,
-            status: b.status
-        });
-    });
-
-    // 2. Fetch standard bookings made by public customers for this car's shadow car
-    const shadowCar = await mongoose.model('Car').findOne({ outwardCarId: outwardCar.originalOutputId });
-    if (shadowCar) {
-        const regularBookings = await mongoose.model('Booking').find({
-            car: shadowCar._id,
-            status: { $in: ['confirmed', 'active', 'completed'] }
-        }).lean();
-
-        regularBookings.forEach(b => {
-            const days = b.totalDays || 1;
-            allBookings.push({
-                days,
-                status: b.status
-            });
-        });
-    }
-
-    let totalDaysBooked = 0;
-    allBookings.forEach(b => {
-        totalDaysBooked += b.days;
-    });
-
-    const tripsCount = allBookings.length;
-    const totalRevenue = (outwardCar.pricePerDay || 0) * totalDaysBooked;
-
-    // Vendor Cost (Vendor Due) - Only counts if the car has done at least 1 trip
-    let totalVendorCost = 0;
-    if (tripsCount > 0) {
-        if (outwardCar.vendorSettlement?.agreedAmount) {
-            totalVendorCost = outwardCar.vendorSettlement.agreedAmount;
-        } else if (outwardCar.vendorAgreementType === 'monthly') {
-            totalVendorCost = outwardCar.agreementPricePerMonth || 0;
-        } else {
-            totalVendorCost = (outwardCar.agreementPricePerDay || 0) * totalDaysBooked;
-        }
-    }
+    const { tripsCount, totalDaysBooked, totalRevenue, pendingAmount, totalVendorCost, netProfit } =
+        summarizeOutwardTrips(outwardCar, await getOutwardCarTrips(outwardCar));
 
     const carPayments = await VendorTransaction.find({
         vendor: vendorId,
@@ -2487,13 +2434,15 @@ const buildOutwardCarStats = async (outwardCar, vendorId) => {
 
     return {
         tripsCount,
+        totalDaysBooked,
         totalRevenue,
+        pendingAmount,
         totalVendorCost,
         totalPaidForCar,
         remainingVendorDue: Math.max(totalVendorCost - totalPaidForCar, 0),
         excessPaidForCar: Math.max(totalPaidForCar - totalVendorCost, 0),
         paymentCount: carPayments.length,
-        netProfit: totalRevenue - totalVendorCost,
+        netProfit,
         settlementConfigured: Boolean(outwardCar?.vendorSettlement?.agreedAmount)
     };
 };
@@ -4169,64 +4118,13 @@ export const getCarTripDetails = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Car not found' });
         }
 
-        const trips = [];
-
-        // 1. Manual outward bookings from fleet portal
-        const outwardBookings = await mongoose.model('OutwardBooking').find({
-            carId: outwardCar.originalOutputId,
-            status: { $ne: 'cancelled' }
-        }).lean();
-
-        outwardBookings.forEach(b => {
-            const from = new Date(b.fromDate);
-            const to = new Date(b.toDate);
-            const days = Math.ceil((to - from) / (1000 * 3600 * 24)) || 1;
-            const adminRevenue = b.totalPrice || (outwardCar.pricePerDay || 0) * days;
+        // Same trips the vendor ledger and admin car list use; revenue = amount collected
+        const trips = (await getOutwardCarTrips(outwardCar)).map((t) => {
             const vendorCost = outwardCar.vendorAgreementType === 'monthly'
                 ? 0
-                : (outwardCar.agreementPricePerDay || 0) * days;
-
-            trips.push({
-                bookingId: b.bookingId || b._id,
-                source: 'Fleet (Manual)',
-                fromDate: b.fromDate,
-                toDate: b.toDate,
-                days,
-                adminRevenue,
-                vendorCost,
-                profit: adminRevenue - vendorCost,
-                status: b.status
-            });
+                : (outwardCar.agreementPricePerDay || 0) * t.days;
+            return { ...t, adminRevenue: t.collected, vendorCost, profit: t.collected - vendorCost };
         });
-
-        // 2. Standard customer bookings (shadow car)
-        const shadowCar = await mongoose.model('Car').findOne({ outwardCarId: outwardCar.originalOutputId }).lean();
-        if (shadowCar) {
-            const regularBookings = await mongoose.model('Booking').find({
-                car: shadowCar._id,
-                status: { $in: ['confirmed', 'active', 'completed'] }
-            }).lean();
-
-            regularBookings.forEach(b => {
-                const days = b.totalDays || 1;
-                const adminRevenue = b.pricing?.totalPrice || (outwardCar.pricePerDay || 0) * days;
-                const vendorCost = outwardCar.vendorAgreementType === 'monthly'
-                    ? 0
-                    : (outwardCar.agreementPricePerDay || 0) * days;
-
-                trips.push({
-                    bookingId: b.bookingId || b._id,
-                    source: 'Customer Booking',
-                    fromDate: b.tripStart?.date,
-                    toDate: b.tripEnd?.date,
-                    days,
-                    adminRevenue,
-                    vendorCost,
-                    profit: adminRevenue - vendorCost,
-                    status: b.status
-                });
-            });
-        }
 
         // Sort by date desc
         trips.sort((a, b) => new Date(b.fromDate) - new Date(a.fromDate));

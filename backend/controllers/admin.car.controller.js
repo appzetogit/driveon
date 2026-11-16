@@ -659,15 +659,19 @@ export const updateCar = async (req, res) => {
       });
     }
 
-    // Outward cars stay linked to a CRM vendor
+    // Admin cars are vendor-owned: picking a vendor links (or converts) the car to an outward car
     let vendor = null;
-    if (car.source === 'outward' && req.body.vendorId) {
+    if (req.body.vendorId) {
       vendor = await findVendor(req.body.vendorId);
       if (!vendor) {
         return res.status(400).json({
           success: false,
           message: 'Please select a valid vendor',
         });
+      }
+      if (car.source !== 'outward' || !car.outwardCarId) {
+        car.source = 'outward';
+        car.outwardCarId = car.outwardCarId || `fleet_car_out_${Date.now()}_${Math.random().toString(16).slice(2)}`;
       }
     }
 
@@ -1135,7 +1139,7 @@ export const getCarRecord = async (req, res) => {
     if (standardCarId) {
       const rawBookings = await Booking.find({ 
         car: standardCarId,
-        status: { $nin: ['cancelled', 'rejected'] }
+        status: { $in: ['confirmed', 'active', 'completed'] } // same as CRM / car list (utils/vendorCost.js)
       })
         .populate('user', 'name email phone')
         .sort({ createdAt: -1 });

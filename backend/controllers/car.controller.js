@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import Booking from '../models/Booking.js';
 import OutwardBooking from '../models/OutwardBooking.js';
 import { apiCache } from '../utils/cache.js';
+import { syncShadowCar } from '../utils/shadowCar.js';
 
 let lastOutwardSyncTime = 0;
 
@@ -23,75 +24,8 @@ export const getAllCars = async (req, res) => {
           const OutwardCar = mongoose.model('OutwardCar');
           if (OutwardCar) {
             const outwardCars = await OutwardCar.find({});
-            const adminUser = await mongoose.model('User').findOne({ role: 'admin' }) || await mongoose.model('User').findOne({});
-            const ownerId = adminUser ? adminUser._id : new mongoose.Types.ObjectId('60d5ec0f1f1d2c001f8e29a5');
-
             for (const outCar of outwardCars) {
-              const shadowCar = await Car.findOne({ outwardCarId: outCar.originalOutputId });
-              
-              let isCarInRepair = false;
-              if (shadowCar) {
-                const RepairJob = mongoose.model('RepairJob');
-                const activeRepair = await RepairJob.findOne({ car: shadowCar._id, status: { $nin: ['Completed', 'Cancelled'] } });
-                if (activeRepair) {
-                  isCarInRepair = true;
-                }
-              }
-
-              const carData = {
-                owner: ownerId,
-                brand: outCar.brand || 'External',
-                model: outCar.model || 'Vehicle',
-                year: 2024,
-                color: 'N/A',
-                registrationNumber: outCar.carNumber || outCar.registrationNumber || `OUT-${outCar.originalOutputId.slice(-6).toUpperCase()}`,
-                carType: 'suv',
-                fuelType: 'petrol',
-                transmission: 'automatic',
-                seatingCapacity: 5,
-                pricePerDay: outCar.pricePerDay || 1000,
-                pricePerWeek: (outCar.pricePerDay || 1000) * 7,
-                pricePerMonth: (outCar.pricePerDay || 1000) * 30,
-                securityDeposit: 0,
-                description: `This verified premium outward car is owned by ${outCar.ownerName} and managed by DriveOn partners.`,
-                isAvailable: isCarInRepair ? false : true,
-                status: 'active',
-                images: outCar.image ? [{ url: outCar.image, isPrimary: true }] : [],
-                location: {
-                  city: outCar.location || 'Indore',
-                  state: 'Madhya Pradesh',
-                  address: outCar.location || 'Indore'
-                },
-                ownerInfo: {
-                  name: outCar.ownerName,
-                  email: 'partner@driveon.com',
-                  phone: outCar.ownerPhone
-                },
-                ownerName: outCar.ownerName,
-                source: 'outward',
-                outwardCarId: outCar.originalOutputId,
-                features: outCar.features || []
-              };
-
-              if (shadowCar) {
-                // Only write to DB if the data actually changed to save IO operations
-                let hasChanged = false;
-                for (const key of Object.keys(carData)) {
-                  if (key === 'location') {
-                    if (shadowCar.location?.city !== carData.location.city) hasChanged = true;
-                  } else if (key === 'features') {
-                    if (shadowCar.features?.length !== carData.features.length) hasChanged = true;
-                  } else if (shadowCar[key] !== carData[key]) {
-                    hasChanged = true;
-                  }
-                }
-                if (hasChanged) {
-                  Object.assign(shadowCar, carData);
-                  await shadowCar.save();
-                }
-              } else {
-                await Car.create(carData);
-              }
+              await syncShadowCar(outCar);
             }
           }
         } catch (syncErr) {
@@ -359,62 +293,10 @@ export const getCarById = async (req, res) => {
         const OutwardCar = mongoose.model('OutwardCar');
         const outCar = await OutwardCar.findOne({ originalOutputId: car.outwardCarId });
         if (outCar) {
-          const adminUser = await mongoose.model('User').findOne({ role: 'admin' }) || await mongoose.model('User').findOne({});
-          const ownerId = adminUser ? adminUser._id : new mongoose.Types.ObjectId('60d5ec0f1f1d2c001f8e29a5');
-
-          const RepairJob = mongoose.model('RepairJob');
-          const activeRepair = await RepairJob.findOne({ car: car._id, status: { $nin: ['Completed', 'Cancelled'] } });
-          const isCarInRepair = !!activeRepair;
-
-          const carData = {
-            owner: ownerId,
-            brand: outCar.brand || car.brand,
-            model: outCar.model || car.model,
-            year: 2024,
-            color: 'N/A',
-            registrationNumber: outCar.carNumber || outCar.registrationNumber || car.registrationNumber,
-            carType: 'suv',
-            fuelType: 'petrol',
-            transmission: 'automatic',
-            seatingCapacity: 5,
-            pricePerDay: outCar.pricePerDay || car.pricePerDay,
-            pricePerWeek: (outCar.pricePerDay || 1000) * 7,
-            pricePerMonth: (outCar.pricePerDay || 1000) * 30,
-            securityDeposit: 0,
-            description: `This verified premium outward car is owned by ${outCar.ownerName} and managed by DriveOn partners.`,
-            isAvailable: isCarInRepair ? false : true,
-            status: 'active',
-            images: outCar.image ? [{ url: outCar.image, isPrimary: true }] : car.images,
-            location: {
-              city: outCar.location || 'Indore',
-              state: 'Madhya Pradesh',
-              address: outCar.location || 'Indore'
-            },
-            ownerInfo: {
-              name: outCar.ownerName,
-              email: 'partner@driveon.com',
-              phone: outCar.ownerPhone
-            },
-            ownerName: outCar.ownerName,
-            source: 'outward',
-            outwardCarId: outCar.originalOutputId,
-            features: outCar.features || []
-          };
-
-          let hasChanged = false;
-          for (const key of Object.keys(carData)) {
-            if (key === 'location') {
-              if (car.location?.city !== carData.location.city) hasChanged = true;
-            } else if (key === 'features') {
-              if (car.features?.length !== carData.features.length) hasChanged = true;
-            } else if (car[key] !== carData[key]) {
-              hasChanged = true;
-            }
-          }
-          if (hasChanged) {
-            await Car.updateOne({ _id: carId }, { $set: carData });
-            Object.assign(car, carData);
-          }
+          // Sync writes to its own copy; reflect the Fleet-owned fields in this response
+          const synced = await syncShadowCar(outCar);
+          ['brand', 'model', 'registrationNumber', 'pricePerDay', 'location', 'ownerInfo', 'isAvailable', 'features', 'images']
+            .forEach((key) => car.set(key, synced.get(key)));
         }
       } catch (syncErr) {
         console.error('Detail sync error in getCarById:', syncErr);
