@@ -181,11 +181,11 @@ export const verifyDL = async (req, res) => {
       });
     }
 
-    const dlRegex = /^[A-Z]{2}[0-9]{2}[A-Z]{1,2}-[0-9]{4}-[0-9]{7}$/;
-    if (!dlRegex.test(dlNo.trim().toUpperCase())) {
+    const dlRegex = /^[A-Z0-9]{8,20}$/; // loose sanity check only; formats vary by state/era, the API does real validation
+    if (!dlRegex.test(dlNo.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())) {
       return res.status(400).json({
         success: false,
-        message: 'Please enter driving license in correct format: e.g. MP41N-2021-0130258'
+        message: 'Please enter a valid driving license number'
       });
     }
 

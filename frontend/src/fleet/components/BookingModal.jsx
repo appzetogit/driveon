@@ -205,9 +205,9 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
     const cleanLicenseNumber = licenseNumber.trim();
     if (!cleanLicenseNumber) { setError('Please enter a valid Driving License number'); return; }
 
-    const dlRegex = /^[A-Z]{2}[0-9]{2}[A-Z]{1,2}-[0-9]{4}-[0-9]{7}$/;
-    if (!dlRegex.test(cleanLicenseNumber)) {
-      setError('Please enter driving license in correct format: e.g. MP41N-2021-0522258');
+    const dlRegex = /^[A-Z0-9]{8,20}$/; // loose sanity check only; formats vary by state/era, the API does real validation
+    if (!dlRegex.test(cleanLicenseNumber.replace(/[^A-Z0-9]/gi, '').toUpperCase())) {
+      setError('Please enter a valid driving license number');
       alert('Invalid data');
       return;
     }
@@ -792,7 +792,7 @@ const BookingModal = ({ open, onClose, car, existingBookings, onConfirm }) => {
                       onChange={(e) => setLicenseNumber(e.target.value.toUpperCase())}
                       className="w-full rounded-lg border px-3 py-1.5 text-sm outline-none"
                       style={{ borderColor: colors.borderMedium, backgroundColor: colors.backgroundSecondary, color: colors.textPrimary }}
-                      placeholder="e.g. MP41N-2026-0186258"
+                      placeholder="e.g. MP41N-2021-0130258 / GJ38 20210004554"
                     />
                   </div>
                   <div>
